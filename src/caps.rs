@@ -1,33 +1,49 @@
+//! 路由能力与参数策略。
+//!
+//! 能力描述的是“客户端协议到后端协议”这条路由允许采用的转换策略，
+//! 不是模型能力清单本身。
 use bitflags::bitflags;
 
 use crate::ids::ProtocolId;
 
+/// 转换模式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum Mode {
+    /// 源协议与目标协议一致，按原生透传路径处理。
     NativePassthrough,
+    /// 在源协议与目标协议之间做语义转换。
     #[default]
     Converted,
+    /// 无法无损表达时立即失败，而不是静默降级。
     Strict,
 }
 
+/// thinking 与签名内容的处理策略。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ThinkingPolicy {
+    /// 原样保留。
     Passthrough,
+    /// 在目标协议中转换为等价的 thinking 表达。
     Adapt,
+    /// 目标不支持时显式剥离并上报。
     Strip,
+    /// 目标不支持时直接拒绝。
     Reject,
 }
 
+/// 工具调用 ID 的处理策略。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub enum ToolIdPolicy {
+    /// 不修改、不截断、不重新生成。
     #[default]
     Preserve,
 }
 
 bitflags! {
+    /// 目标路由支持的采样与请求参数集合。
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct ParamSet: u32 {
         const TEMPERATURE = 1 << 0;
@@ -47,13 +63,20 @@ bitflags! {
     }
 }
 
+/// 一条协议路由允许采用的转换策略。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Capabilities {
+    /// 转换模式。
     pub mode: Mode,
+    /// thinking 与签名内容策略。
     pub thinking: ThinkingPolicy,
+    /// 工具调用 ID 策略。
     pub tool_id: ToolIdPolicy,
+    /// 是否允许透传 `cache_control`。
     pub passthrough_cache_control: bool,
+    /// 是否允许透传 Anthropic beta 头对应的请求字段。
     pub passthrough_betas: bool,
+    /// 目标路由支持的参数集合。
     pub supported: ParamSet,
 }
 
@@ -71,12 +94,17 @@ impl Default for Capabilities {
 }
 
 impl Capabilities {
+    /// 判断当前路由是否支持指定的参数集合。
     #[must_use]
     pub fn supports(self, params: ParamSet) -> bool {
         self.supported.contains(params)
     }
 }
 
+/// 根据入站协议与后端协议生成默认能力策略。
+///
+/// 相同协议得到 [`Mode::NativePassthrough`]，跨协议得到 [`Mode::Converted`]。
+/// 当前 `model` 参数保留给 host 侧扩展；需要按模型覆盖时使用 [`crate::StaticHost`]。
 #[must_use]
 pub fn resolve(inbound: ProtocolId, backend: ProtocolId, _model: &str) -> Capabilities {
     let mode = if inbound == backend {

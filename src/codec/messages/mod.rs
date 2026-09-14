@@ -24,6 +24,7 @@ const DEFAULT_THINKING_BUDGET: u64 = 1024;
 const ANTHROPIC_CONTENT_BLOCK: &str = "anthropic_content_block";
 const ANTHROPIC_SYSTEM_BLOCK: &str = "anthropic_system_block";
 
+/// Anthropic Messages 协议 codec。
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Messages;
 

@@ -20,6 +20,7 @@
 
 | 文件 | 状态 | 读者 | 说明 |
 |---|---|---|---|
+| `../README.md` | 活跃 | SDK 使用者 | 安装、快速开始、示例、限制与发布信息 |
 | `../AGENTS.md` | 活跃 | 所有 agent | 第一入口：命令 + 文档地图 + 优先级 |
 | `DESIGN.md` | 冻结-稳定 | 架构/实现 | 正式项目设计：定位、架构、API、不变量、陷阱 |
 | `spec/IR.md` | 半稳定 | codec 实现者 | IR 规范：类型、canonical form、IR 级不变量 |
@@ -63,6 +64,7 @@
 
 ```text
 llmwire/
+├── README.md                     # SDK 使用入口
 ├── AGENTS.md                     # agent 入口
 └── docs/
     ├── README.md                 # 本文件

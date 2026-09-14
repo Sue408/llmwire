@@ -15,7 +15,7 @@
 - 一个**字节级转换固件**：`&[u8]` 进，`&mut Vec<u8>` 出。
 - 一个**请求级有界对象**：构造于请求到达，销毁于响应发完，绝不跨请求存活。
 - 一个**诚实的转换器**：任何降级、丢弃、不可表达，都通过 `Report` 显式上报。
-- 覆盖 **OpenAI Chat Completions / Anthropic Messages / OpenAI Responses** 三协议互转；M5 计划补图片输入（Gemini、图片输出推迟）。
+- 覆盖 **OpenAI Chat Completions / Anthropic Messages / OpenAI Responses** 三协议互转；M5 已补图片输入（Gemini、图片输出推迟）。
 
 **不是什么**
 
