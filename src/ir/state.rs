@@ -80,6 +80,19 @@ impl StreamState {
         self.usage
     }
 
+    pub fn message(&self) -> Option<(&str, &str)> {
+        self.message
+            .as_ref()
+            .map(|(id, model)| (id.as_ref(), model.as_ref()))
+    }
+
+    pub fn tool_start(&self, index: usize) -> Option<&ToolStart> {
+        self.blocks.iter().find_map(|block| match block {
+            BlockState::Open(open) if open.index == index => open.tool.as_ref(),
+            _ => None,
+        })
+    }
+
     pub fn is_finished(&self) -> bool {
         self.finished
     }

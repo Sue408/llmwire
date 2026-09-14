@@ -167,6 +167,37 @@ mod converter {
     }
 
     #[test]
+    fn streams_chat_to_responses_without_done_marker() {
+        let mut converter = converter(
+            ProtocolId::Chat,
+            ProtocolId::Responses,
+            resolve(ProtocolId::Chat, ProtocolId::Responses, "gpt-test"),
+        )
+        .unwrap();
+        let mut request_out = Vec::new();
+        converter
+            .request(&streaming_chat_request(), &mut request_out)
+            .unwrap();
+
+        let input = concat!(
+            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hel\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo\"},\"finish_reason\":null}]}\n\n",
+            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let mut stream_out = Vec::new();
+        converter.feed(input.as_bytes(), &mut stream_out).unwrap();
+        let text = String::from_utf8(stream_out).unwrap();
+
+        assert!(text.contains("event: response.output_item.added"));
+        assert!(text.contains("event: response.output_text.delta"));
+        assert!(text.contains("event: response.completed"));
+        assert!(!text.contains("[DONE]"));
+
+        let mut tail = Vec::new();
+        assert_eq!(converter.finish(&mut tail).unwrap(), Termination::Explicit);
+    }
+    #[test]
     fn responses_protocol_non_stream_is_supported() {
         let mut converter = converter(
             ProtocolId::Chat,
