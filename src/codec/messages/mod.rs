@@ -14,6 +14,7 @@ use crate::ir::{
     ReasoningEffort, Role, Sampling, StopReason, Thinking, ToolChoice, ToolDef, ToolId, ToolResult,
     ToolResultContent, ToolUse, Turn, Usage,
 };
+use crate::report::{Report, Severity, UnmappedReason};
 use crate::Error;
 use wire::*;
 
@@ -61,6 +62,22 @@ impl ProtocolCodec for Messages {
     }
 
     fn encode_request(&self, conversation: &Conversation) -> Result<Vec<u8>, Error> {
+        self.encode_request_with_report(conversation, &mut Report::new())
+    }
+
+    fn encode_request_with_report(
+        &self,
+        conversation: &Conversation,
+        report: &mut Report,
+    ) -> Result<Vec<u8>, Error> {
+        if conversation.sampling.max_output_tokens.is_none() {
+            report.warn(
+                "request.max_tokens",
+                "messages max_tokens is required; filled with default 4096",
+                Severity::Degraded,
+            );
+        }
+
         let messages = conversation
             .turns
             .iter()
@@ -114,7 +131,20 @@ impl ProtocolCodec for Messages {
     }
 
     fn encode_response(&self, output: &AssistantOutput) -> Result<Vec<u8>, Error> {
+        self.encode_response_with_report(output, &mut Report::new())
+    }
+
+    fn encode_response_with_report(
+        &self,
+        output: &AssistantOutput,
+        report: &mut Report,
+    ) -> Result<Vec<u8>, Error> {
         if output.choices.len() > 1 {
+            report.unmapped(
+                "output.choices",
+                UnmappedReason::UnsupportedByTarget,
+                Severity::Fatal,
+            );
             return Err(unsupported("messages multiple choices"));
         }
 

@@ -14,6 +14,7 @@ use crate::ir::{
     ReasoningEffort, Role, Sampling, StopReason, Thinking, ToolChoice, ToolDef, ToolId, ToolResult,
     ToolResultContent, ToolUse, ToolUseKind, Turn, Usage,
 };
+use crate::report::{Report, Severity, UnmappedReason};
 use crate::Error;
 use wire::*;
 
@@ -25,13 +26,31 @@ pub struct Responses;
 
 impl ProtocolCodec for Responses {
     fn decode_request(&self, body: &[u8]) -> Result<Conversation, Error> {
+        self.decode_request_with_report(body, &mut Report::new())
+    }
+
+    fn decode_request_with_report(
+        &self,
+        body: &[u8],
+        report: &mut Report,
+    ) -> Result<Conversation, Error> {
         let request: ResponsesRequestIn = parse_json(body)?;
         if request.store == Some(true) {
+            report.unmapped(
+                "request.store",
+                UnmappedReason::PolicyBlocked,
+                Severity::Fatal,
+            );
             return Err(unsupported(
                 "responses store=true is not supported in stateless mode",
             ));
         }
         if request.previous_response_id.is_some() {
+            report.unmapped(
+                "request.previous_response_id",
+                UnmappedReason::PolicyBlocked,
+                Severity::Fatal,
+            );
             return Err(unsupported(
                 "responses previous_response_id is not supported in stateless mode",
             ));
@@ -136,7 +155,20 @@ impl ProtocolCodec for Responses {
     }
 
     fn encode_response(&self, output: &AssistantOutput) -> Result<Vec<u8>, Error> {
+        self.encode_response_with_report(output, &mut Report::new())
+    }
+
+    fn encode_response_with_report(
+        &self,
+        output: &AssistantOutput,
+        report: &mut Report,
+    ) -> Result<Vec<u8>, Error> {
         if output.choices.len() > 1 {
+            report.unmapped(
+                "output.choices",
+                UnmappedReason::UnsupportedByTarget,
+                Severity::Fatal,
+            );
             return Err(unsupported("responses multiple choices"));
         }
 

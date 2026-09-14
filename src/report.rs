@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::ids::OpaqueKind;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     Silent,
@@ -49,6 +51,19 @@ impl Report {
         Self::default()
     }
 
+    pub fn unmapped(
+        &mut self,
+        field: impl Into<Box<str>>,
+        reason: UnmappedReason,
+        severity: Severity,
+    ) {
+        self.unmapped.push(Unmapped {
+            field: field.into(),
+            reason,
+            severity,
+        });
+    }
+
     pub fn warn(
         &mut self,
         field: impl Into<Box<str>>,
@@ -60,5 +75,36 @@ impl Report {
             message: message.into(),
             severity,
         });
+    }
+
+    pub fn opaque(
+        &mut self,
+        field: impl Into<Box<str>>,
+        kind: OpaqueKind,
+        len: usize,
+        severity: Severity,
+    ) {
+        self.warn(field, format!("opaque kind={kind:?} len={len}"), severity);
+    }
+
+    pub fn merge(&mut self, other: Report) {
+        self.unmapped.extend(other.unmapped);
+        self.warnings.extend(other.warnings);
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.unmapped.is_empty() && self.warnings.is_empty()
+    }
+
+    #[must_use]
+    pub fn has_fatal(&self) -> bool {
+        self.unmapped
+            .iter()
+            .any(|entry| entry.severity == Severity::Fatal)
+            || self
+                .warnings
+                .iter()
+                .any(|entry| entry.severity == Severity::Fatal)
     }
 }
