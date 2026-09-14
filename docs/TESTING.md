@@ -109,21 +109,45 @@ cargo insta review                              # 快照审阅
 - 把流式的一次性网络错误当作"正常完成"（违反 `STREAMING.md §5`）。
 - 测试里放行静默丢弃（违反 INV-3）——应断言 `Report` 有对应条目。
 
-## 7. Live API smoke
+## 7. Live API 与兼容性矩阵
 
-M0-3 的真 API 冒烟测试默认标记为 `ignored`，配置从项目根目录的 `.env` 读取。
+真实 API 测试是 dev-only harness；核心库仍遵守 INV-5，不引入 HTTP 客户端或 async runtime。所有 live tests 默认 `ignored`，普通 `cargo test` 不访问网络。
+
+### 7.1 环境配置
+
+从项目根目录读取 `.env`：
 
 ```powershell
 Copy-Item .env.example .env
 cargo test -p llmwire --test live_chat -- --ignored --nocapture
+cargo test -p llmwire --test live_messages -- --ignored --nocapture
+cargo test -p llmwire --test live_responses -- --ignored --nocapture
 ```
 
-`.env` 至少需要：
+计划变量：
 
 ```dotenv
 LLMWIRE_LIVE_CHAT_URL=https://api.openai.com/v1/chat/completions
-LLMWIRE_LIVE_CHAT_API_KEY=...
-LLMWIRE_LIVE_CHAT_MODEL=...
+LLMWIRE_LIVE_CHAT_API_KEY=
+LLMWIRE_LIVE_CHAT_MODEL=
+
+LLMWIRE_LIVE_MESSAGES_URL=https://api.anthropic.com/v1/messages
+LLMWIRE_LIVE_MESSAGES_API_KEY=
+LLMWIRE_LIVE_MESSAGES_MODEL=
+
+LLMWIRE_LIVE_RESPONSES_URL=https://api.openai.com/v1/responses
+LLMWIRE_LIVE_RESPONSES_API_KEY=
+LLMWIRE_LIVE_RESPONSES_MODEL=
 ```
 
-`.env` 不进入版本控制；`.env.example` 仅保存空 key 和默认端点。
+`.env` 不进入版本控制；`.env.example` 只保存空 key 与默认端点。
+
+### 7.2 覆盖分层
+
+| 层 | 目标 | 覆盖 |
+|---|---|---|
+| Smoke | 每种协议最小请求可用 | 请求/响应可解码；usage 不伪造；错误清晰 |
+| Compatibility | 真实上游语义兼容 | tool id 字节保真、thinking/signature、`cache_control`、多轮工具、流式终止 |
+| Matrix | 多端点支持度记录 | 官方端点、本地网关、兼容端点的差异与已知限制 |
+
+Live 测试只断言协议契约与不变量，不断言模型输出文本。网络错误、429、超时等属于 host 传输层，不得混入 codec 的正常完成语义。
