@@ -68,6 +68,7 @@ tests/
 ├── streaming_chat.rs
 ├── streaming_messages.rs
 ├── streaming_responses.rs
+├── live_cross_protocol.rs
 ├── converter.rs
 └── contract/            # 契约测试
     ├── basic.rs
@@ -98,6 +99,7 @@ cargo test -p llmwire                          # 全部
 cargo test -p llmwire --test roundtrip_chat    # 单个往返
 cargo test -p llmwire --test boundaries      # P0 边界
 cargo test -p llmwire --test protocol_matrix  # 3x3 矩阵
+cargo test -p llmwire --test live_cross_protocol -- --ignored
 cargo test -p llmwire --test golden_tool_id
 ```
 
@@ -169,6 +171,6 @@ Live 测试只断言协议契约与不变量，不断言模型输出文本。网
 | Responses | function_call id | 本地网关 | verified | `call_id` 与 arguments 已校验 |
 | Responses | 流式终止 | 本地网关 | verified | `response.completed` 路径已执行 |
 | 全部协议 | 官方端点 | 官方 API | not-run | 当前矩阵仅覆盖本地网关 |
-| 全部协议 | 跨协议 live | 本地网关 | not-run | 当前 live 测试均为同协议 smoke |
+| 全部协议 | 跨协议 live | 本地网关 | verified | 6 个有向组合的文本非流式与流式均已执行 |
 
 Responses 真实验证暴露了 `reasoning_text` 与 `encrypted_content` 共存的事件序列；实现已修正为同一 reasoning item 中分别保留明文 thinking 与加密 opaque。

@@ -366,3 +366,116 @@ fn find_tool_use(output: &AssistantOutput) -> Option<&ToolUse> {
             _ => None,
         })
 }
+
+#[test]
+fn converter_nonstream_strips_unencodable_source_parts_with_report() {
+    let mut converter = converter(
+        ProtocolId::Chat,
+        ProtocolId::Messages,
+        resolve(ProtocolId::Chat, ProtocolId::Messages, "matrix-model"),
+    )
+    .unwrap();
+    let mut request_out = Vec::new();
+    converter
+        .request(&text_request(ProtocolId::Chat, false), &mut request_out)
+        .unwrap();
+
+    let response = br#"{
+        "content":[
+            {"type":"thinking","thinking":"reason","signature":"sig_123"},
+            {"type":"text","text":"world"}
+        ],
+        "stop_reason":"end_turn",
+        "usage":{"input_tokens":1,"output_tokens":1}
+    }"#;
+    let mut client_response = Vec::new();
+    converter.response(response, &mut client_response).unwrap();
+
+    let decoded = Chat.decode_response(&client_response).unwrap();
+    assert_eq!(text_from_output(&decoded), "world");
+    assert!(!converter.take_report().is_empty());
+}
+
+#[test]
+fn converter_stream_omits_unsupported_source_part_lifecycle() {
+    let mut converter = converter(
+        ProtocolId::Chat,
+        ProtocolId::Messages,
+        resolve(ProtocolId::Chat, ProtocolId::Messages, "matrix-model"),
+    )
+    .unwrap();
+    let mut request_out = Vec::new();
+    converter
+        .request(&text_request(ProtocolId::Chat, true), &mut request_out)
+        .unwrap();
+
+    let input = concat!(
+        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"model\":\"matrix-model\"}}\n\n",
+        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n",
+        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"reason\"}}\n\n",
+        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"sig_123\"}}\n\n",
+        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"world\"}}\n\n",
+        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n",
+        "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n",
+        "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+    );
+    let mut client_stream = Vec::new();
+    converter
+        .feed(input.as_bytes(), &mut client_stream)
+        .unwrap();
+    let mut tail = Vec::new();
+    assert_eq!(converter.finish(&mut tail).unwrap(), Termination::Explicit);
+    client_stream.extend_from_slice(&tail);
+
+    let (state, termination) = decode_stream(ProtocolId::Chat, &client_stream);
+    assert_eq!(termination, Some(Termination::Explicit));
+    assert_eq!(
+        text_from_output(&state.assistant_output().unwrap()),
+        "world"
+    );
+    assert!(!converter.take_report().is_empty());
+}
+
+#[test]
+fn converter_stream_omits_unsupported_signature_but_keeps_thinking_text() {
+    let mut converter = converter(
+        ProtocolId::Responses,
+        ProtocolId::Messages,
+        resolve(ProtocolId::Responses, ProtocolId::Messages, "matrix-model"),
+    )
+    .unwrap();
+    let mut request_out = Vec::new();
+    converter
+        .request(&text_request(ProtocolId::Responses, true), &mut request_out)
+        .unwrap();
+
+    let input = concat!(
+        "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"model\":\"matrix-model\"}}\n\n",
+        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"thinking\",\"thinking\":\"\"}}\n\n",
+        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"reason\"}}\n\n",
+        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"signature_delta\",\"signature\":\"sig_123\"}}\n\n",
+        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+        "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":1,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+        "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"world\"}}\n\n",
+        "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":1}\n\n",
+        "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n",
+        "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
+    );
+    let mut client_stream = Vec::new();
+    converter
+        .feed(input.as_bytes(), &mut client_stream)
+        .unwrap();
+    let mut tail = Vec::new();
+    assert_eq!(converter.finish(&mut tail).unwrap(), Termination::Explicit);
+    client_stream.extend_from_slice(&tail);
+
+    let (state, termination) = decode_stream(ProtocolId::Responses, &client_stream);
+    assert_eq!(termination, Some(Termination::Explicit));
+    assert_eq!(
+        text_from_output(&state.assistant_output().unwrap()),
+        "world"
+    );
+    assert!(!converter.take_report().is_empty());
+}
