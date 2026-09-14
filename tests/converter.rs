@@ -55,7 +55,7 @@ mod converter {
     }
 
     #[test]
-    fn streams_chat_to_messages_and_finishes_explicitly() {
+    fn streams_messages_to_chat_and_finishes_explicitly() {
         let mut converter = converter(
             ProtocolId::Chat,
             ProtocolId::Messages,
@@ -71,21 +71,23 @@ mod converter {
         assert_eq!(outbound_json["stream"], true);
 
         let input = concat!(
-            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hel\"},\"finish_reason\":null}]}\n\n",
-            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo\"},\"finish_reason\":null}]}\n\n",
-            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
-            "data: [DONE]\n\n",
+            "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"model\":\"claude-test\"}}\n\n",
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n",
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n",
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n",
+            "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n",
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n",
         );
         let mut stream_out = Vec::new();
         converter.feed(input.as_bytes(), &mut stream_out).unwrap();
         let text = String::from_utf8(stream_out).unwrap();
 
-        assert!(text.contains("event: message_start"));
-        assert!(text.contains("event: content_block_start"));
-        assert!(text.contains("event: content_block_delta"));
-        assert!(text.contains("event: message_delta"));
-        assert!(text.contains("event: message_stop"));
-
+        assert!(
+            text.contains("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}"),
+            "{text}"
+        );
+        assert!(text.contains("\"content\":\"hello\""));
+        assert!(text.contains("data: [DONE]"));
         let mut tail = Vec::new();
         assert_eq!(converter.finish(&mut tail).unwrap(), Termination::Explicit);
         assert!(tail.is_empty());
@@ -106,11 +108,14 @@ mod converter {
 
         let mut stream_out = Vec::new();
         converter
-            .feed(b"data: {not-json}\n\n", &mut stream_out)
+            .feed(
+                b"event: message_start\ndata: {not-json}\n\n",
+                &mut stream_out,
+            )
             .unwrap();
 
         let text = String::from_utf8(stream_out).unwrap();
-        assert!(text.contains("event: error"));
+        assert!(text.contains("\"error\""), "{text}");
         assert!(text.contains("invalid input"));
 
         let report = converter.take_report();
@@ -167,7 +172,7 @@ mod converter {
     }
 
     #[test]
-    fn streams_chat_to_responses_without_done_marker() {
+    fn streams_responses_to_chat_with_done_marker() {
         let mut converter = converter(
             ProtocolId::Chat,
             ProtocolId::Responses,
@@ -180,20 +185,18 @@ mod converter {
             .unwrap();
 
         let input = concat!(
-            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hel\"},\"finish_reason\":null}]}\n\n",
-            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"lo\"},\"finish_reason\":null}]}\n\n",
-            "data: {\"id\":\"chatcmpl-1\",\"model\":\"gpt-test\",\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
-            "data: [DONE]\n\n",
+            "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_1\",\"model\":\"gpt-test\"}}\n\n",
+            "event: response.output_item.added\ndata: {\"type\":\"response.output_item.added\",\"output_index\":0,\"item\":{\"type\":\"message\",\"id\":\"msg_1\"}}\n\n",
+            "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"output_index\":0,\"content_index\":0,\"delta\":\"hello\"}\n\n",
+            "event: response.output_text.done\ndata: {\"type\":\"response.output_text.done\",\"output_index\":0,\"content_index\":0,\"text\":\"hello\"}\n\n",
+            "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"status\":\"completed\",\"model\":\"gpt-test\",\"output\":[]}}\n\n",
         );
         let mut stream_out = Vec::new();
         converter.feed(input.as_bytes(), &mut stream_out).unwrap();
         let text = String::from_utf8(stream_out).unwrap();
 
-        assert!(text.contains("event: response.output_item.added"));
-        assert!(text.contains("event: response.output_text.delta"));
-        assert!(text.contains("event: response.completed"));
-        assert!(!text.contains("[DONE]"));
-
+        assert!(text.contains("\"content\":\"hello\""));
+        assert!(text.contains("data: [DONE]"));
         let mut tail = Vec::new();
         assert_eq!(converter.finish(&mut tail).unwrap(), Termination::Explicit);
     }

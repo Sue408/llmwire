@@ -137,7 +137,7 @@ impl ConverterImpl {
 
     fn process_frames(&mut self, frames: Vec<SseFrame>, out: &mut Vec<u8>) -> Result<(), Error> {
         for frame in frames {
-            let decoded = self.source.decode_stream_frame_with_report(
+            let decoded = self.target.decode_stream_frame_with_report(
                 &frame,
                 &self.state,
                 &mut self.report,
@@ -146,7 +146,7 @@ impl ConverterImpl {
             self.record_degradations(&decoded.events);
 
             for event in &decoded.events {
-                match self.target.encode_stream_event_with_report(
+                match self.source.encode_stream_event_with_report(
                     event,
                     &self.state,
                     &mut self.report,
@@ -247,7 +247,7 @@ impl ConverterImpl {
             Severity::Degraded
         };
 
-        if self.dst == ProtocolId::Chat || self.caps.thinking == ThinkingPolicy::Strip {
+        if self.src == ProtocolId::Chat || self.caps.thinking == ThinkingPolicy::Strip {
             for (index, event) in events.iter().enumerate() {
                 match event {
                     Event::PartDelta {
@@ -287,7 +287,7 @@ impl ConverterImpl {
             }
         }
 
-        if self.dst == ProtocolId::Messages {
+        if self.src == ProtocolId::Messages {
             for (index, event) in events.iter().enumerate() {
                 if matches!(event, Event::MessageStart { .. }) && self.state.usage().input.is_none()
                 {
@@ -320,7 +320,7 @@ impl ConverterImpl {
 
         let event = Event::Error(Box::new(error));
         match self
-            .target
+            .source
             .encode_stream_event_with_report(&event, &self.state, &mut self.report)
         {
             Ok(frames) => append_frames(out, frames),
