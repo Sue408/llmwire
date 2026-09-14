@@ -10,7 +10,7 @@ use crate::ir::{
     ReasoningEffort, Role, Sampling, StopReason, ToolChoice, ToolDef, ToolId, ToolResult,
     ToolResultContent, ToolUse, ToolUseKind, Turn, Usage,
 };
-use crate::report::{Report, Severity};
+use crate::report::{Report, Severity, UnmappedReason};
 use crate::Error;
 use wire::*;
 
@@ -42,8 +42,16 @@ impl ProtocolCodec for Chat {
             presence_penalty,
             frequency_penalty,
             reasoning_effort,
+            extra,
         } = request;
 
+        for key in extra.keys() {
+            report.unmapped(
+                format!("request.{key}"),
+                UnmappedReason::UnsupportedByTarget,
+                Severity::Degraded,
+            );
+        }
         if max_tokens.is_some() && max_completion_tokens.is_none() {
             report.warn(
                 "request.max_tokens",
@@ -129,23 +137,34 @@ impl ProtocolCodec for Chat {
     }
 
     fn decode_response(&self, body: &[u8]) -> Result<AssistantOutput, Error> {
+        self.decode_response_with_report(body, &mut Report::new())
+    }
+
+    fn decode_response_with_report(
+        &self,
+        body: &[u8],
+        report: &mut Report,
+    ) -> Result<AssistantOutput, Error> {
         let response: ChatResponseIn = parse_json(body)?;
         let provider_finish = response
             .extensions
             .as_ref()
             .and_then(|extensions| extensions.provider_finish_reason.clone());
 
-        let choices = response
-            .choices
-            .into_iter()
-            .map(|choice| {
-                Ok(Choice {
-                    index: choice.index,
-                    parts: decode_message_parts(choice.message)?,
-                    finish: decode_finish(choice.finish_reason, provider_finish.clone()),
-                })
-            })
-            .collect::<Result<Vec<_>, Error>>()?;
+        let mut choices = Vec::new();
+        for choice in response.choices {
+            let finish_path = format!("choices[{}].finish_reason", choice.index);
+            choices.push(Choice {
+                index: choice.index,
+                parts: decode_message_parts(choice.message)?,
+                finish: decode_finish_with_report(
+                    choice.finish_reason,
+                    provider_finish.clone(),
+                    &finish_path,
+                    report,
+                ),
+            });
+        }
 
         Ok(AssistantOutput {
             choices,
@@ -393,6 +412,20 @@ fn reasoning_effort_name(effort: ReasoningEffort) -> &'static str {
 }
 
 fn decode_finish(finish_reason: Option<String>, provider_finish: Option<String>) -> Finish {
+    decode_finish_with_report(
+        finish_reason,
+        provider_finish,
+        "finish_reason",
+        &mut Report::new(),
+    )
+}
+
+fn decode_finish_with_report(
+    finish_reason: Option<String>,
+    provider_finish: Option<String>,
+    field: &str,
+    report: &mut Report,
+) -> Finish {
     let provider_raw = provider_finish
         .or_else(|| finish_reason.clone())
         .unwrap_or_default();
@@ -401,8 +434,14 @@ fn decode_finish(finish_reason: Option<String>, provider_finish: Option<String>)
         Some("length") => StopReason::MaxTokens,
         Some("tool_calls") => StopReason::ToolUse,
         Some("content_filter") => StopReason::ContentFilter,
-        Some("function_call") => StopReason::ToolUse,
-        Some(value) => StopReason::Other(value.into()),
+        Some("function_call") => {
+            report.unmapped(field, UnmappedReason::NotRepresentable, Severity::Degraded);
+            StopReason::ToolUse
+        }
+        Some(value) => {
+            report.unmapped(field, UnmappedReason::NotRepresentable, Severity::Degraded);
+            StopReason::Other(value.into())
+        }
         None => StopReason::Other(Box::from("")),
     };
     Finish {

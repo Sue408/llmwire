@@ -1,4 +1,4 @@
-use llmwire::codec::{Messages, ProtocolCodec};
+use llmwire::codec::{Chat, Messages, ProtocolCodec};
 use llmwire::{converter, resolve, Mode, OpaqueKind, ProtocolId, Report, Severity, UnmappedReason};
 
 #[test]
@@ -156,4 +156,49 @@ fn report_stateful_responses_rejection_has_path() {
     assert_eq!(report.unmapped[0].field.as_ref(), "request.store");
     assert_eq!(report.unmapped[0].reason, UnmappedReason::PolicyBlocked);
     assert_eq!(report.unmapped[0].severity, Severity::Fatal);
+}
+
+#[test]
+fn report_chat_unknown_request_field() {
+    let mut report = Report::new();
+    let request = br#"{
+        "model": "model",
+        "messages": [{"role": "user", "content": "hello"}],
+        "metadata": {"trace": "abc"}
+    }"#;
+
+    Chat.decode_request_with_report(request, &mut report)
+        .unwrap();
+
+    assert!(report
+        .unmapped
+        .iter()
+        .any(|entry| entry.field.as_ref() == "request.metadata"
+            && entry.reason == UnmappedReason::UnsupportedByTarget));
+}
+
+#[test]
+fn report_chat_private_finish_reason() {
+    let mut report = Report::new();
+    let response = br#"{
+        "id": "chatcmpl-1",
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": "hello"},
+            "finish_reason": "vendor_stop"
+        }]
+    }"#;
+
+    let output = Chat
+        .decode_response_with_report(response, &mut report)
+        .unwrap();
+
+    assert!(matches!(
+        output.choices[0].finish.canonical,
+        llmwire::ir::StopReason::Other(ref value) if value.as_ref() == "vendor_stop"
+    ));
+    assert!(report
+        .unmapped
+        .iter()
+        .any(|entry| entry.field.as_ref() == "choices[0].finish_reason"));
 }

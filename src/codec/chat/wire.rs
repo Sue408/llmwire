@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
@@ -17,6 +19,8 @@ pub(crate) struct ChatRequestIn {
     pub presence_penalty: Option<f32>,
     pub frequency_penalty: Option<f32>,
     pub reasoning_effort: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]

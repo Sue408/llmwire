@@ -114,13 +114,13 @@ Chat 流：单 `data:` JSON chunk，末 `data: [DONE]`。
 
 ## 7. 契约测试清单（本协议）
 
-- [ ] 纯文本非流式/流式往返
-- [ ] 多轮 tool call：`tool_call_id == tool_use.id`（golden）
-- [ ] 并行 tool_calls（`index` 区分）
-- [ ] `arguments` 跨 chunk 拼接 + 转义符切断
-- [ ] 首个 chunk 无 role / 重复 role
-- [ ] `include_usage` 末包 / 缺失 usage
-- [ ] `n>1`
-- [ ] 注释行 `: keep-alive` 容忍
-- [ ] `finish_reason` 私有值
-- [ ] 未知字段进 `Report`（INV-3）
+- [x] 纯文本非流式/流式往返
+- [x] 多轮 tool call：`tool_call_id == tool_use.id`（golden）
+- [x] 并行 tool_calls（`index` 区分）
+- [x] `arguments` 跨 chunk 拼接 + 转义符切断
+- [x] 首个 chunk 无 role / 重复 role
+- [x] `include_usage` 末包 / 缺失 usage
+- [x] `n>1`
+- [x] 注释行 `: keep-alive` 容忍
+- [x] `finish_reason` 私有值
+- [x] 未知字段进 `Report`（INV-3）

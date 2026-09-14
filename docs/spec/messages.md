@@ -112,14 +112,14 @@ Messages SSE 事件序列：`message_start → content_block_start → content_b
 
 ## 7. 契约测试清单（本协议）
 
-- [ ] 纯文本非流式/流式往返
-- [ ] tool_use 多轮：`tool_use.id` 字节保真（golden）
-- [ ] tool_result 聚合进同一 user message
-- [ ] thinking 开/关 + `redacted_thinking` 字节保真
-- [ ] `cache_control` 原样透传
-- [ ] 并行 tool_use（content_block index）
-- [ ] `input_json_delta` 跨 chunk 拼接 + 转义切断
-- [ ] `message_start` 缺 input / `message_delta` 合并
-- [ ] `ping` 容忍
-- [ ] `max_tokens` 缺失补默认
-- [ ] 服务端工具 `srvtoolu_` 判定
+- [x] 纯文本非流式/流式往返
+- [x] tool_use 多轮：`tool_use.id` 字节保真（golden）
+- [x] tool_result 聚合进同一 user message
+- [x] thinking 开/关 + `redacted_thinking` 字节保真
+- [x] `cache_control` 原样透传
+- [x] 并行 tool_use（content_block index）
+- [x] `input_json_delta` 跨 chunk 拼接 + 转义切断
+- [x] `message_start` 缺 input / `message_delta` 合并
+- [x] `ping` 容忍
+- [x] `max_tokens` 缺失补默认
+- [x] 服务端工具 `srvtoolu_` 判定
