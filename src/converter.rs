@@ -52,6 +52,7 @@ struct ConverterImpl {
 impl Converter for ConverterImpl {
     fn request(&mut self, body: &[u8], out: &mut Vec<u8>) -> Result<(), Error> {
         let stream = request_stream_mode(body)?;
+        let model = request_model(body)?;
         let conversation = self
             .source
             .decode_request_with_report(body, &mut self.report)?;
@@ -59,7 +60,7 @@ impl Converter for ConverterImpl {
         let encoded = self
             .target
             .encode_request_with_report(&conversation, &mut self.report)?;
-        let encoded = set_stream_mode(encoded, stream)?;
+        let encoded = set_request_metadata(encoded, stream, model.as_deref())?;
         self.conversation = Some(conversation);
         self.streaming = Some(stream);
         out.extend_from_slice(&encoded);
@@ -358,12 +359,28 @@ fn request_stream_mode(body: &[u8]) -> Result<bool, Error> {
         .unwrap_or(false))
 }
 
-fn set_stream_mode(body: Vec<u8>, stream: bool) -> Result<Vec<u8>, Error> {
+fn request_model(body: &[u8]) -> Result<Option<String>, Error> {
+    let value: Value =
+        serde_json::from_slice(body).map_err(|error| Error::InvalidInput(error.to_string()))?;
+    Ok(value
+        .get("model")
+        .and_then(Value::as_str)
+        .map(str::to_owned))
+}
+fn set_request_metadata(
+    body: Vec<u8>,
+    stream: bool,
+    model: Option<&str>,
+) -> Result<Vec<u8>, Error> {
     let mut value: Value =
         serde_json::from_slice(&body).map_err(|error| Error::InvalidInput(error.to_string()))?;
     let object = value
         .as_object_mut()
         .ok_or_else(|| Error::Protocol("request body must be a JSON object".to_owned()))?;
+
+    if let Some(model) = model {
+        object.insert("model".to_owned(), Value::String(model.to_owned()));
+    }
 
     if stream {
         object.insert("stream".to_owned(), Value::Bool(true));

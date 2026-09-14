@@ -253,4 +253,24 @@ mod converter {
         let encoded = Chat.encode_request(&decoded).unwrap();
         assert!(!encoded.is_empty());
     }
+    #[test]
+    fn converter_preserves_request_model() {
+        let mut converter = converter(
+            ProtocolId::Chat,
+            ProtocolId::Chat,
+            resolve(ProtocolId::Chat, ProtocolId::Chat, "model-a"),
+        )
+        .unwrap();
+        let request = serde_json::json!({
+            "model": "model-a",
+            "messages": [{"role": "user", "content": "hello"}]
+        })
+        .to_string()
+        .into_bytes();
+        let mut outbound = Vec::new();
+        converter.request(&request, &mut outbound).unwrap();
+
+        let value: serde_json::Value = serde_json::from_slice(&outbound).unwrap();
+        assert_eq!(value["model"], "model-a");
+    }
 }
