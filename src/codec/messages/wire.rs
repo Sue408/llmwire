@@ -294,3 +294,88 @@ pub(crate) struct UsageOut {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_creation_input_tokens: Option<u64>,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MessageStartIn {
+    pub message: MessageStartBodyIn,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MessageStartBodyIn {
+    pub id: String,
+    pub model: String,
+    pub usage: Option<UsageIn>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ContentBlockStartIn {
+    pub index: usize,
+    pub content_block: ContentBlockStartBodyIn,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum ContentBlockStartBodyIn {
+    Text {
+        #[serde(default)]
+        text: String,
+    },
+    ToolUse {
+        id: String,
+        name: String,
+        input: Option<serde_json::Value>,
+    },
+    Thinking {
+        #[serde(default)]
+        thinking: String,
+        signature: Option<String>,
+    },
+    RedactedThinking {
+        #[serde(default)]
+        data: String,
+    },
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ContentBlockDeltaIn {
+    pub index: usize,
+    pub delta: ContentBlockDeltaBodyIn,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum ContentBlockDeltaBodyIn {
+    TextDelta {
+        text: String,
+    },
+    ThinkingDelta {
+        thinking: String,
+    },
+    InputJsonDelta {
+        partial_json: String,
+    },
+    SignatureDelta {
+        signature: String,
+    },
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ContentBlockStopIn {
+    pub index: usize,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MessageDeltaIn {
+    pub delta: MessageDeltaBodyIn,
+    pub usage: Option<UsageIn>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct MessageDeltaBodyIn {
+    pub stop_reason: Option<String>,
+    pub stop_sequence: Option<String>,
+}

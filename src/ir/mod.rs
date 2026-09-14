@@ -1,13 +1,17 @@
+mod event;
 mod output;
 mod part;
 mod sampling;
+mod state;
 mod tool;
 mod usage;
 
 pub use crate::ids::OpaqueKind;
+pub use event::{Delta, Event, PartKind, Termination, ToolStart, UsagePatch};
 pub use output::{AssistantOutput, Choice, Finish, StopReason};
 pub use part::{ImageRef, Opaque, Part, Thinking};
 pub use sampling::{Reasoning, ReasoningEffort, Sampling};
+pub use state::StreamState;
 pub use tool::{
     RawJson, ToolChoice, ToolDef, ToolId, ToolResult, ToolResultContent, ToolUse, ToolUseKind,
 };
