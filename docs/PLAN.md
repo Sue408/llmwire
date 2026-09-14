@@ -13,7 +13,7 @@
 | **M0** | crate 骨架 + `ir` + `chat` codec（非流式双向） | M0-3 完成 |
 | **M1** | `messages` codec + `caps`/`resolve`（非流式双向） | M1-3 完成 |
 | **M2** | `framing` + 流式 FSM + `Converter` 门面（流式双向） | M2-5 完成 |
-| **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | 未开始 |
+| **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | M3-3 完成 |
 | **M4** | `StaticHost` + `Report` 全链路 + 契约测试 | 未开始 |
 
 ## 刻意推迟
