@@ -10,7 +10,7 @@
 
 | 里程碑 | 目标 | 状态 |
 |---|---|---|
-| **M0** | crate 骨架 + `ir` + `chat` codec（非流式双向） | 未开始 |
+| **M0** | crate 骨架 + `ir` + `chat` codec（非流式双向） | 进行中（M0-1 完成） |
 | **M1** | `messages` codec + `caps`/`resolve`（非流式双向） | 未开始 |
 | **M2** | `framing` + 流式 FSM + `Converter` 门面（流式双向） | 未开始 |
 | **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | 未开始 |
