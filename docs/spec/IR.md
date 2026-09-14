@@ -272,6 +272,8 @@ pub struct Reasoning {
 ```rust
 #[derive(Debug, Clone, Default)]
 pub struct AssistantOutput {
+    pub id: Option<Box<str>>,        // 供应商响应 ID；None = 未上报
+    pub model: Option<Box<str>>,     // target 实际上报的模型名；None = 未上报
     pub choices: Vec<Choice>,        // n / candidateCount
     pub usage: Usage,
 }
@@ -300,6 +302,8 @@ pub struct Finish {
 ```
 
 **IR-INV-N-1**：`AssistantOutput.choices.len()` 必须反映请求的 `n`；目标协议无法表达多候选时，**上报 `Report`**，不得静默返回单个（`DESIGN.md` TRAP-6）。
+
+**IR-INV-META-1**：响应 `id` / `model` 必须来自 target 上报值。源协议编码 target 未上报的 `model` 时统一写空字符串，不得回填请求模型，也不得发明 `"llmwire"` 等占位名。
 
 ## 8. Usage
 

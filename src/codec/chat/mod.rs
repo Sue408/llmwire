@@ -152,6 +152,8 @@ impl ProtocolCodec for Chat {
             .extensions
             .as_ref()
             .and_then(|extensions| extensions.provider_finish_reason.clone());
+        let id = response.id.map(Into::into);
+        let model = response.model.map(Into::into);
 
         let mut choices = Vec::new();
         for choice in response.choices {
@@ -169,6 +171,8 @@ impl ProtocolCodec for Chat {
         }
 
         Ok(AssistantOutput {
+            id,
+            model,
             choices,
             usage: response.usage.map(decode_usage).unwrap_or_default(),
         })
@@ -188,10 +192,10 @@ impl ProtocolCodec for Chat {
             .unwrap_or_default();
 
         let response = ChatResponseOut {
-            id: "chatcmpl-llmwire",
+            id: output.id.as_deref().unwrap_or_default().to_owned(),
             object: "chat.completion",
             created: 0,
-            model: "llmwire",
+            model: output.model.as_deref().unwrap_or_default().to_owned(),
             choices,
             usage: encode_usage(output.usage),
             extensions: ResponseExtensionsOut {

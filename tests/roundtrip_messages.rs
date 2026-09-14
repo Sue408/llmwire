@@ -182,6 +182,8 @@ fn messages_response_roundtrip() {
 #[test]
 fn messages_response_maps_usage() {
     let output = AssistantOutput {
+        id: None,
+        model: None,
         choices: vec![Choice {
             index: 0,
             parts: vec![Part::Text("answer".into())],

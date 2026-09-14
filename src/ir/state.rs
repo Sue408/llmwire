@@ -194,6 +194,8 @@ impl StreamState {
         parts.sort_by_key(|(index, _)| *index);
 
         Ok(AssistantOutput {
+            id: self.message.as_ref().map(|(id, _)| id.clone()),
+            model: self.message.as_ref().map(|(_, model)| model.clone()),
             choices: vec![Choice {
                 index: 0,
                 parts: parts.into_iter().map(|(_, part)| part).collect(),

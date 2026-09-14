@@ -39,6 +39,8 @@ pub(crate) struct ResponsesReasoningIn {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ResponsesResponseIn {
+    pub id: Option<String>,
+    pub model: Option<String>,
     pub status: String,
     pub incomplete_details: Option<ResponsesIncompleteDetailsIn>,
     #[serde(default)]
@@ -181,11 +183,11 @@ pub(crate) struct ResponsesReasoningOut {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct ResponsesResponseOut {
-    pub id: &'static str,
+    pub id: String,
     pub object: &'static str,
     pub created_at: u64,
     pub status: String,
-    pub model: &'static str,
+    pub model: String,
     pub output: Vec<Box<RawValue>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub incomplete_details: Option<ResponsesIncompleteDetailsOut>,

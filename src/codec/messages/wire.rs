@@ -254,6 +254,8 @@ pub(crate) struct RedactedThinkingBlockOut {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct MessagesResponseIn {
+    pub id: Option<String>,
+    pub model: Option<String>,
     #[serde(default)]
     pub content: Vec<Box<RawValue>>,
     pub stop_reason: Option<String>,
@@ -271,12 +273,12 @@ pub(crate) struct UsageIn {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct MessagesResponseOut {
-    pub id: &'static str,
+    pub id: String,
     #[serde(rename = "type")]
     pub kind: &'static str,
     pub role: &'static str,
     pub content: Vec<Box<RawValue>>,
-    pub model: &'static str,
+    pub model: String,
     pub stop_reason: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stop_sequence: Option<String>,
@@ -303,7 +305,7 @@ pub(crate) struct MessageStartIn {
 #[derive(Debug, Deserialize)]
 pub(crate) struct MessageStartBodyIn {
     pub id: String,
-    pub model: String,
+    pub model: Option<String>,
     pub usage: Option<UsageIn>,
 }
 

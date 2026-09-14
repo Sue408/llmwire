@@ -26,7 +26,7 @@ pub(super) fn decode_stream_frame(
             let input: MessageStartIn = parse_str(data)?;
             let mut events = vec![Event::MessageStart {
                 id: input.message.id.into_boxed_str(),
-                model: input.message.model.into_boxed_str(),
+                model: input.message.model.unwrap_or_default().into_boxed_str(),
             }];
             if let Some(usage) = input.message.usage {
                 events.push(Event::UsagePatch(usage_patch(decode_usage(usage))));

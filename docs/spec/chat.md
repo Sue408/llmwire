@@ -61,6 +61,8 @@
 
 | Chat | IR |
 |---|---|
+| `id` | `AssistantOutput.id` |
+| `model` | `AssistantOutput.model` |
 | `choices[i].message` | `Choice{index: i, parts}` |
 | `message.content` | `Part::Text` |
 | `message.tool_calls[]` | `Part::ToolUse`（`arguments` 存 `RawJson`） |
@@ -73,7 +75,7 @@
 
 ### 3.2 IR → Chat
 
-- 顶层必须完整填充 `id`/`object:"chat.completion"`/`created`/`model`/`choices`/`usage`（`DESIGN.md` TRAP-9 对应报告坑 9）。
+- 顶层必须填充 `id`/`object:"chat.completion"`/`created`/`model`/`choices`/`usage`；`id` 与 `model` 来自 `AssistantOutput`，target 未上报 `model` 时写空字符串，不回填入站请求模型。
 - `Finish.provider_raw` 放入扩展字段（如 `extensions.provider_finish_reason`），对外标准值由 `canonical` 决定。
 - `Part::ToolUse` → `message.tool_calls[]`，`Part::Text` → `message.content`。
 
@@ -94,6 +96,8 @@ Chat 流：单 `data:` JSON chunk，末 `data: [DONE]`。
 | `Error` | 信道 B：流内错误 |
 
 反向（IR → Chat 流）：`ToolArguments` 需拆回 `delta.tool_calls[i].function.arguments`，`index` 由 IR `PartStart.index` 提供。
+
+`MessageStart` 捕获的 `id` / `model` 必须复用于后续**所有** Chat chunk；未捕获时写空字符串，不得逐包写死占位值。
 
 ## 5. StopReason 映射
 

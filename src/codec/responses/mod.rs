@@ -123,6 +123,8 @@ impl ProtocolCodec for Responses {
 
     fn decode_response(&self, body: &[u8]) -> Result<AssistantOutput, Error> {
         let response: ResponsesResponseIn = parse_json(body)?;
+        let id = response.id.map(Into::into);
+        let model = response.model.map(Into::into);
         if response.status == "failed" {
             let message = response
                 .error
@@ -147,6 +149,8 @@ impl ProtocolCodec for Responses {
         )?;
 
         Ok(AssistantOutput {
+            id,
+            model,
             choices: vec![Choice {
                 index: 0,
                 parts,
@@ -187,11 +191,11 @@ impl ProtocolCodec for Responses {
             .unwrap_or_else(|| ("completed".to_owned(), None));
 
         let response = ResponsesResponseOut {
-            id: "resp_llmwire",
+            id: output.id.as_deref().unwrap_or_default().to_owned(),
             object: "response",
             created_at: 0,
             status,
-            model: "llmwire",
+            model: output.model.as_deref().unwrap_or_default().to_owned(),
             output: items,
             incomplete_details,
             usage: encode_usage(output.usage),

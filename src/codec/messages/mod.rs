@@ -119,6 +119,8 @@ impl ProtocolCodec for Messages {
 
     fn decode_response(&self, body: &[u8]) -> Result<AssistantOutput, Error> {
         let response: MessagesResponseIn = parse_json(body)?;
+        let id = response.id.map(Into::into);
+        let model = response.model.map(Into::into);
         let parts = decode_blocks(response.content)?;
         let choice = Choice {
             index: 0,
@@ -127,6 +129,8 @@ impl ProtocolCodec for Messages {
         };
 
         Ok(AssistantOutput {
+            id,
+            model,
             choices: vec![choice],
             usage: response.usage.map(decode_usage).unwrap_or_default(),
         })
@@ -164,11 +168,11 @@ impl ProtocolCodec for Messages {
         });
 
         let response = MessagesResponseOut {
-            id: "msg_llmwire",
+            id: output.id.as_deref().unwrap_or_default().to_owned(),
             kind: "message",
             role: "assistant",
             content,
-            model: "llmwire",
+            model: output.model.as_deref().unwrap_or_default().to_owned(),
             stop_reason,
             stop_sequence,
             usage: encode_usage(output.usage),

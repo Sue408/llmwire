@@ -60,6 +60,8 @@
 
 | Messages | IR |
 |---|---|
+| `id` | `AssistantOutput.id` |
+| `model` | `AssistantOutput.model` |
 | `content[]` blocks | `Choice.parts`（单 choice） |
 | `stop_reason` | `Finish{canonical, provider_raw}` |
 | `usage.input_tokens` | `Usage.input`（见 usage 规约） |
@@ -69,7 +71,7 @@
 
 ### 3.2 IR → Messages
 
-- 顶层填 `id:"msg_*"` / `type:"message"` / `role:"assistant"` / `content[]` / `model` / `stop_reason` / `usage`。
+- 顶层填 `id:"msg_*"` / `type:"message"` / `role:"assistant"` / `content[]` / `model` / `stop_reason` / `usage`；`id` 与 `model` 来自 `AssistantOutput`，target 未上报 `model` 时写空字符串。
 - thinking block 原样回传，**绝不**生成假 `signature`（INV-1）。
 
 ## 4. 流式映射
@@ -89,6 +91,8 @@ Messages SSE 事件序列：`message_start → content_block_start → content_b
 | `message_stop` | `Finish` 终止 / `Termination::Explicit` |
 | `error` | `Event::Error`（信道 B） |
 | `ping` | 忽略（不产生事件） |
+
+`message_start.message.id` / `model` 进入 `MessageStart`；编码时直接使用该事件值，不得回填请求模型。
 
 ## 5. StopReason 映射
 

@@ -4,6 +4,10 @@ use super::{Part, Usage};
 /// 一次模型响应的规范化输出。
 #[derive(Debug, Clone, Default)]
 pub struct AssistantOutput {
+    /// 供应商响应 ID；缺失时保持未知。
+    pub id: Option<Box<str>>,
+    /// 供应商实际使用的模型名；缺失时保持未知。
+    pub model: Option<Box<str>>,
     /// 候选输出。
     pub choices: Vec<Choice>,
     /// usage 信息，未知值保持未知。

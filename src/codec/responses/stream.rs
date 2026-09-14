@@ -42,7 +42,7 @@ pub(super) fn decode_stream_frame(
             })?;
             vec![Event::MessageStart {
                 id: string_field(response, "id")?.into(),
-                model: string_field(response, "model").unwrap_or("llmwire").into(),
+                model: string_field(response, "model").unwrap_or_default().into(),
             }]
         }
         "response.in_progress" => {
@@ -51,7 +51,7 @@ pub(super) fn decode_stream_frame(
             } else if let Some(response) = value.get("response") {
                 vec![Event::MessageStart {
                     id: string_field(response, "id")?.into(),
-                    model: string_field(response, "model").unwrap_or("llmwire").into(),
+                    model: string_field(response, "model").unwrap_or_default().into(),
                 }]
             } else {
                 Vec::new()

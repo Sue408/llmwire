@@ -88,6 +88,7 @@ tests/
 ├── roundtrip_chat.rs
 ├── roundtrip_messages.rs
 ├── roundtrip_responses.rs
+├── response_metadata.rs
 ├── golden_tool_id.rs
 ├── streaming_chat.rs
 ├── streaming_messages.rs
@@ -124,6 +125,7 @@ cargo test -p llmwire                          # 全部
 cargo test -p llmwire --test roundtrip_chat    # 单个往返
 cargo test -p llmwire --test boundaries      # P0 边界
 cargo test -p llmwire --test protocol_matrix  # 3x3 矩阵
+cargo test -p llmwire --test response_metadata # 响应 id/model 矩阵
 cargo test -p llmwire --test live_cross_protocol -- --ignored
 cargo test -p llmwire --test golden_tool_id
 cargo test -p llmwire --test robustness   # P2 抗压与属性测试

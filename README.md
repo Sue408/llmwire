@@ -23,6 +23,7 @@ Host 把原始请求或响应字节交给请求级 `Converter`，它负责：
 | Anthropic Messages | 请求、响应、流式 |
 | OpenAI Responses | 无状态请求、响应、流式 |
 | 三协议双向文本转换 | 支持 |
+| response `id` / `model` | 透传 target 上报值；`model` 缺失时统一空字符串 |
 | tool call / tool result | 支持，ID 字节保真 |
 | thinking / signature / encrypted reasoning | 支持或显式降级，不伪造 |
 | usage / cache usage | 保留未知与零的差异 |

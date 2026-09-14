@@ -161,7 +161,7 @@ pub(super) fn decode_stream_frame(
 
 pub(super) fn encode_stream_event(
     event: &Event,
-    _state: &StreamState,
+    state: &StreamState,
 ) -> Result<Vec<SseFrame>, Error> {
     match event {
         Event::MessageStart { id, model } => Ok(vec![json_frame(ChatChunkOut {
@@ -183,61 +183,23 @@ pub(super) fn encode_stream_event(
             index,
             kind: PartKind::ToolUse,
             tool: Some(tool),
-        } => Ok(vec![json_frame(ChatChunkOut {
-            id: "chatcmpl-llmwire".to_owned(),
-            object: "chat.completion.chunk",
-            created: 0,
-            model: "llmwire".to_owned(),
-            choices: vec![ChatChunkChoiceOut {
-                index: 0,
-                delta: ChatDeltaOut {
-                    tool_calls: Some(vec![ChatToolCallDeltaOut {
-                        index: *index as u32,
-                        id: Some(tool.id.0.to_string()),
-                        kind: Some("function"),
-                        function: ChatFunctionCallDeltaOut {
-                            name: Some(tool.name.to_string()),
-                            arguments: None,
-                        },
-                    }]),
-                    ..ChatDeltaOut::default()
-                },
-                finish_reason: None,
-            }],
-            usage: None,
-        })?]),
-        Event::PartStart { .. } | Event::PartStop { .. } => Ok(Vec::new()),
-        Event::PartDelta { index, delta } => match delta {
-            Delta::Text(text) => Ok(vec![json_frame(ChatChunkOut {
-                id: "chatcmpl-llmwire".to_owned(),
+        } => {
+            let (id, model) = response_metadata(state);
+            Ok(vec![json_frame(ChatChunkOut {
+                id,
                 object: "chat.completion.chunk",
                 created: 0,
-                model: "llmwire".to_owned(),
-                choices: vec![ChatChunkChoiceOut {
-                    index: 0,
-                    delta: ChatDeltaOut {
-                        content: Some(text.to_string()),
-                        ..ChatDeltaOut::default()
-                    },
-                    finish_reason: None,
-                }],
-                usage: None,
-            })?]),
-            Delta::ToolArguments(arguments) => Ok(vec![json_frame(ChatChunkOut {
-                id: "chatcmpl-llmwire".to_owned(),
-                object: "chat.completion.chunk",
-                created: 0,
-                model: "llmwire".to_owned(),
+                model,
                 choices: vec![ChatChunkChoiceOut {
                     index: 0,
                     delta: ChatDeltaOut {
                         tool_calls: Some(vec![ChatToolCallDeltaOut {
                             index: *index as u32,
-                            id: None,
-                            kind: None,
+                            id: Some(tool.id.0.to_string()),
+                            kind: Some("function"),
                             function: ChatFunctionCallDeltaOut {
-                                name: None,
-                                arguments: Some(arguments.to_string()),
+                                name: Some(tool.name.to_string()),
+                                arguments: None,
                             },
                         }]),
                         ..ChatDeltaOut::default()
@@ -245,36 +207,87 @@ pub(super) fn encode_stream_event(
                     finish_reason: None,
                 }],
                 usage: None,
-            })?]),
+            })?])
+        }
+        Event::PartStart { .. } | Event::PartStop { .. } => Ok(Vec::new()),
+        Event::PartDelta { index, delta } => match delta {
+            Delta::Text(text) => {
+                let (id, model) = response_metadata(state);
+                Ok(vec![json_frame(ChatChunkOut {
+                    id,
+                    object: "chat.completion.chunk",
+                    created: 0,
+                    model,
+                    choices: vec![ChatChunkChoiceOut {
+                        index: 0,
+                        delta: ChatDeltaOut {
+                            content: Some(text.to_string()),
+                            ..ChatDeltaOut::default()
+                        },
+                        finish_reason: None,
+                    }],
+                    usage: None,
+                })?])
+            }
+            Delta::ToolArguments(arguments) => {
+                let (id, model) = response_metadata(state);
+                Ok(vec![json_frame(ChatChunkOut {
+                    id,
+                    object: "chat.completion.chunk",
+                    created: 0,
+                    model,
+                    choices: vec![ChatChunkChoiceOut {
+                        index: 0,
+                        delta: ChatDeltaOut {
+                            tool_calls: Some(vec![ChatToolCallDeltaOut {
+                                index: *index as u32,
+                                id: None,
+                                kind: None,
+                                function: ChatFunctionCallDeltaOut {
+                                    name: None,
+                                    arguments: Some(arguments.to_string()),
+                                },
+                            }]),
+                            ..ChatDeltaOut::default()
+                        },
+                        finish_reason: None,
+                    }],
+                    usage: None,
+                })?])
+            }
             Delta::Thinking(_) | Delta::Opaque(_) => Ok(Vec::new()),
         },
-        Event::UsagePatch(patch) => Ok(vec![json_frame(ChatChunkOut {
-            id: "chatcmpl-llmwire".to_owned(),
-            object: "chat.completion.chunk",
-            created: 0,
-            model: "llmwire".to_owned(),
-            choices: Vec::new(),
-            usage: Some(UsageOut {
-                prompt_tokens: patch.input,
-                completion_tokens: patch.output,
-                total_tokens: match (patch.input, patch.output) {
-                    (Some(input), Some(output)) => Some(input + output),
-                    _ => None,
-                },
-                prompt_tokens_details: patch
-                    .cached
-                    .map(|cached_tokens| PromptTokensDetailsOut { cached_tokens }),
-                completion_tokens_details: patch
-                    .reasoning
-                    .map(|reasoning_tokens| CompletionTokensDetailsOut { reasoning_tokens }),
-            }),
-        })?]),
-        Event::Finish(finish) => {
-            let finish_frame = json_frame(ChatChunkOut {
-                id: "chatcmpl-llmwire".to_owned(),
+        Event::UsagePatch(patch) => {
+            let (id, model) = response_metadata(state);
+            Ok(vec![json_frame(ChatChunkOut {
+                id,
                 object: "chat.completion.chunk",
                 created: 0,
-                model: "llmwire".to_owned(),
+                model,
+                choices: Vec::new(),
+                usage: Some(UsageOut {
+                    prompt_tokens: patch.input,
+                    completion_tokens: patch.output,
+                    total_tokens: match (patch.input, patch.output) {
+                        (Some(input), Some(output)) => Some(input + output),
+                        _ => None,
+                    },
+                    prompt_tokens_details: patch
+                        .cached
+                        .map(|cached_tokens| PromptTokensDetailsOut { cached_tokens }),
+                    completion_tokens_details: patch
+                        .reasoning
+                        .map(|reasoning_tokens| CompletionTokensDetailsOut { reasoning_tokens }),
+                }),
+            })?])
+        }
+        Event::Finish(finish) => {
+            let (id, model) = response_metadata(state);
+            let finish_frame = json_frame(ChatChunkOut {
+                id,
+                object: "chat.completion.chunk",
+                created: 0,
+                model,
                 choices: vec![ChatChunkChoiceOut {
                     index: 0,
                     delta: ChatDeltaOut::default(),
@@ -290,6 +303,13 @@ pub(super) fn encode_stream_event(
             }
         }))?]),
     }
+}
+
+fn response_metadata(state: &StreamState) -> (String, String) {
+    state
+        .message()
+        .map(|(id, model)| (id.to_owned(), model.to_owned()))
+        .unwrap_or_default()
 }
 
 fn json_frame(value: ChatChunkOut) -> Result<SseFrame, Error> {

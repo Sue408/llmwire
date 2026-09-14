@@ -95,6 +95,8 @@ pub(crate) enum StopIn {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ChatResponseIn {
+    pub id: Option<String>,
+    pub model: Option<String>,
     #[serde(default)]
     pub choices: Vec<ResponseChoiceIn>,
     pub usage: Option<UsageIn>,
@@ -250,10 +252,10 @@ pub(crate) enum StopOut {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct ChatResponseOut {
-    pub id: &'static str,
+    pub id: String,
     pub object: &'static str,
     pub created: u64,
-    pub model: &'static str,
+    pub model: String,
     pub choices: Vec<ResponseChoiceOut>,
     pub usage: UsageOut,
     pub extensions: ResponseExtensionsOut,

@@ -59,6 +59,8 @@
 
 | Responses | IR |
 |---|---|
+| `id` | `AssistantOutput.id` |
+| `model` | `AssistantOutput.model` |
 | `status` | `Finish`（见 §5） |
 | `incomplete_details.reason` | `Finish.provider_raw` |
 | `output[].type:"message"` → `content[].type:"output_text"` | `Choice.parts` (`Part::Text`) |
@@ -72,7 +74,7 @@
 
 ### 3.2 IR → Responses
 
-- 顶层填 `id:"resp_*"` / `object:"response"` / `created_at` / `status` / `model` / `output[]` / `usage`。
+- 顶层填 `id:"resp_*"` / `object:"response"` / `created_at` / `status` / `model` / `output[]` / `usage`；`id` 与 `model` 来自 `AssistantOutput`，target 未上报 `model` 时写空字符串。
 - `output` 即使空数组也不得省略。
 
 ## 4. 流式映射
@@ -94,6 +96,8 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 | `response.failed` | `Event::Error` |
 | `error` | `Event::Error`（信道 B） |
 | 内置工具事件（`web_search_call.*` 等） | `PartStart` + `PartDelta::Opaque` + `PartStop` 透传 / 记 `Report` |
+
+`response.created` 捕获的 `id` / `model` 必须复用于后续事件及终态 snapshot；未捕获时写空字符串，不得写死占位值。
 
 ## 5. status 映射
 

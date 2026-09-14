@@ -69,6 +69,8 @@ fn constructs_core_types() {
     };
 
     let output = AssistantOutput {
+        id: None,
+        model: None,
         choices: vec![Choice {
             index: 0,
             parts: vec![Part::Text("answer".into())],
