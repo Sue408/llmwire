@@ -118,6 +118,55 @@ pub fn converter(
 - 工厂只按协议对**构造**对象；"用哪对、何时调"由 host 决定。
 - `caps` 由 host 通过 `Host` 端口提供（见 §5），决定策略而非协议细节。
 
+### 4.1 能力策略
+
+`Capabilities` 描述**入站协议 → 后端协议**这条路由允许采用的转换策略：
+
+```rust
+pub struct Capabilities {
+    pub mode: Mode,
+    pub thinking: ThinkingPolicy,
+    pub tool_id: ToolIdPolicy,
+    pub passthrough_cache_control: bool,
+    pub passthrough_betas: bool,
+    pub supported: ParamSet,
+}
+
+pub enum Mode { NativePassthrough, Converted, Strict }
+pub enum ThinkingPolicy { Passthrough, Adapt, Strip, Reject }
+pub enum ToolIdPolicy { Preserve }
+```
+
+```rust
+bitflags! {
+    pub struct ParamSet: u32 {
+        const TEMPERATURE = 1 << 0;
+        const TOP_P = 1 << 1;
+        const TOP_K = 1 << 2;
+        const MAX_OUTPUT_TOKENS = 1 << 3;
+        const STOP = 1 << 4;
+        const SEED = 1 << 5;
+        const N = 1 << 6;
+        const PRESENCE_PENALTY = 1 << 7;
+        const FREQUENCY_PENALTY = 1 << 8;
+        const REASONING = 1 << 9;
+        const TOOLS = 1 << 10;
+        const TOOL_CHOICE = 1 << 11;
+        const CACHE_CONTROL = 1 << 12;
+        const BETAS = 1 << 13;
+    }
+}
+```
+
+`resolve(inbound, backend, model)` 是目前唯一的路由级能力入口：
+
+- `inbound == backend`：`Mode::NativePassthrough`；否则为 `Mode::Converted`。`Strict` 保留给 host 显式覆盖，阻断所有 `Fatal` 降级。
+- `tool_id` 恒为 `ToolIdPolicy::Preserve`；任何未来策略都必须可逆，不得重生成 id。
+- `thinking`：目标是 Messages / Responses 时为 `Passthrough`；目标是 Chat 时为 `Strip`。`Adapt` / `Reject` 保留给 host 的模型级覆盖。
+- `passthrough_cache_control` 与 `passthrough_betas` 仅在目标为 Messages 时为 `true`。
+- `supported: ParamSet` 声明目标协议可表达的 IR 参数集合。`model` 当前不细化该集合，后续由 `Host` 覆盖。
+- `ParamSet` 未包含的已出现参数必须进入 `Report`，不得静默丢弃（INV-3）。
+
 ## 5. 模块边界与目录结构
 
 ```text
