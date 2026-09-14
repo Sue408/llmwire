@@ -118,13 +118,13 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 
 ## 7. 契约测试清单（本协议）
 
-- [ ] 文本非流式/流式往返
-- [ ] `function_call` 多轮：`call_id` 保真（golden）
-- [ ] `reasoning.encrypted_content` 字节保真
-- [ ] `status:completed` / `incomplete` / `cancelled` 三分支
-- [ ] `response.completed` 结束（无 `[DONE]`）
-- [ ] `output_index` / `content_index` 定位
-- [ ] 并行 function_call
-- [ ] `previous_response_id` 返回 `Unsupported`
-- [ ] 内置工具 item 透传 / 上报
-- [ ] `output_text` 便捷字段与 `output[]` 一致性
+- [x] 文本非流式/流式往返
+- [x] `function_call` 多轮：`call_id` 保真（golden）
+- [x] `reasoning.encrypted_content` 字节保真
+- [x] `status:completed` / `incomplete` / `cancelled` 三分支
+- [x] `response.completed` 结束（无 `[DONE]`）
+- [x] `output_index` / `content_index` 定位
+- [x] 并行 function_call
+- [x] `previous_response_id` 返回 `Unsupported`
+- [x] 内置工具 item 透传 / 上报
+- [x] `output_text` 便捷字段与 `output[]` 一致性
