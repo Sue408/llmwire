@@ -4,6 +4,7 @@ mod wire;
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 
+use super::image::{decode_openai_image_url, encode_openai_image_url};
 use crate::codec::ProtocolCodec;
 use crate::ir::{
     AssistantOutput, Choice, Conversation, Finish, ImageRef, Part, RawJson, Reasoning,
@@ -301,9 +302,10 @@ fn decode_content_parts(parts: Vec<ContentPartIn>) -> Result<Vec<Part>, Error> {
         .into_iter()
         .map(|part| match part {
             ContentPartIn::Text { text } => Ok(Part::Text(text)),
-            ContentPartIn::ImageUrl { image_url } => {
-                Ok(Part::Image(ImageRef::Url(image_url.url.into())))
-            }
+            ContentPartIn::ImageUrl { image_url } => Ok(Part::Image(ImageRef {
+                source: decode_openai_image_url(image_url.url)?,
+                detail: None,
+            })),
         })
         .collect()
 }
@@ -491,14 +493,11 @@ fn encode_user_turn(turn: &Turn, messages: &mut Vec<MessageOut>) -> Result<(), E
                 messages.push(encode_tool_result(result)?);
             }
             Part::Text(text) => pending.push(ContentPartOut::Text { text: text.clone() }),
-            Part::Image(ImageRef::Url(url)) => pending.push(ContentPartOut::ImageUrl {
+            Part::Image(image) => pending.push(ContentPartOut::ImageUrl {
                 image_url: ImageUrlOut {
-                    url: url.to_string(),
+                    url: encode_openai_image_url(&image.source),
                 },
             }),
-            Part::Image(ImageRef::Base64 { .. }) => {
-                return Err(unsupported("chat base64 image"));
-            }
             _ => return Err(unsupported("chat user part")),
         }
     }
@@ -582,12 +581,11 @@ fn encode_content_parts(parts: &[Part]) -> Result<Vec<ContentPartOut>, Error> {
         .iter()
         .map(|part| match part {
             Part::Text(text) => Ok(ContentPartOut::Text { text: text.clone() }),
-            Part::Image(ImageRef::Url(url)) => Ok(ContentPartOut::ImageUrl {
+            Part::Image(image) => Ok(ContentPartOut::ImageUrl {
                 image_url: ImageUrlOut {
-                    url: url.to_string(),
+                    url: encode_openai_image_url(&image.source),
                 },
             }),
-            Part::Image(ImageRef::Base64 { .. }) => Err(unsupported("chat base64 image")),
             _ => Err(unsupported("chat content part")),
         })
         .collect()

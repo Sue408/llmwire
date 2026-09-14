@@ -1,4 +1,5 @@
 mod chat;
+mod image;
 mod messages;
 mod responses;
 

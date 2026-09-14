@@ -16,9 +16,15 @@ pub enum Part {
 }
 
 #[derive(Debug, Clone)]
+pub struct ImageRef {
+    pub source: ImageSource,
+    pub detail: Option<Box<str>>,
+}
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum ImageRef {
-    Url(Box<str>),
+pub enum ImageSource {
+    RemoteUrl(Box<str>),
     Base64 {
         media_type: Box<str>,
         data: Box<str>,

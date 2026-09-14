@@ -10,9 +10,9 @@ use serde_json::value::RawValue;
 use crate::codec::ProtocolCodec;
 use crate::ids::OpaqueKind;
 use crate::ir::{
-    AssistantOutput, Choice, Conversation, Finish, ImageRef, Opaque, Part, RawJson, Reasoning,
-    ReasoningEffort, Role, Sampling, StopReason, Thinking, ToolChoice, ToolDef, ToolId, ToolResult,
-    ToolResultContent, ToolUse, Turn, Usage,
+    AssistantOutput, Choice, Conversation, Finish, ImageRef, ImageSource, Opaque, Part, RawJson,
+    Reasoning, ReasoningEffort, Role, Sampling, StopReason, Thinking, ToolChoice, ToolDef, ToolId,
+    ToolResult, ToolResultContent, ToolUse, Turn, Usage,
 };
 use crate::report::{Report, Severity, UnmappedReason};
 use crate::Error;
@@ -229,14 +229,20 @@ fn decode_block(raw: Box<RawValue>) -> Result<Part, Error> {
             let block: ImageBlockIn = parse_str(raw.get())?;
             match block.source.kind.as_str() {
                 "base64" => match (block.source.media_type, block.source.data) {
-                    (Some(media_type), Some(data)) => Ok(Part::Image(ImageRef::Base64 {
-                        media_type: media_type.into(),
-                        data: data.into(),
+                    (Some(media_type), Some(data)) => Ok(Part::Image(ImageRef {
+                        source: ImageSource::Base64 {
+                            media_type: media_type.into(),
+                            data: data.into(),
+                        },
+                        detail: None,
                     })),
                     _ => Ok(opaque_block(ANTHROPIC_CONTENT_BLOCK, &raw)),
                 },
                 "url" => match block.source.url {
-                    Some(url) => Ok(Part::Image(ImageRef::Url(url.into()))),
+                    Some(url) => Ok(Part::Image(ImageRef {
+                        source: ImageSource::RemoteUrl(url.into()),
+                        detail: None,
+                    })),
                     None => Ok(opaque_block(ANTHROPIC_CONTENT_BLOCK, &raw)),
                 },
                 _ => Ok(opaque_block(ANTHROPIC_CONTENT_BLOCK, &raw)),
@@ -460,8 +466,8 @@ fn encode_block(part: &Part) -> Result<Box<RawValue>, Error> {
             kind: "text",
             text: text.clone(),
         }),
-        Part::Image(ImageRef::Base64 { media_type, data }) => {
-            raw_from_serializable(&ImageBlockOut {
+        Part::Image(image) => match &image.source {
+            ImageSource::Base64 { media_type, data } => raw_from_serializable(&ImageBlockOut {
                 kind: "image",
                 source: ImageSourceOut {
                     kind: "base64",
@@ -469,17 +475,17 @@ fn encode_block(part: &Part) -> Result<Box<RawValue>, Error> {
                     data: Some(data.to_string()),
                     url: None,
                 },
-            })
-        }
-        Part::Image(ImageRef::Url(url)) => raw_from_serializable(&ImageBlockOut {
-            kind: "image",
-            source: ImageSourceOut {
-                kind: "url",
-                media_type: None,
-                data: None,
-                url: Some(url.to_string()),
-            },
-        }),
+            }),
+            ImageSource::RemoteUrl(url) => raw_from_serializable(&ImageBlockOut {
+                kind: "image",
+                source: ImageSourceOut {
+                    kind: "url",
+                    media_type: None,
+                    data: None,
+                    url: Some(url.to_string()),
+                },
+            }),
+        },
         Part::ToolUse(tool_use) => raw_from_serializable(&ToolUseBlockOut {
             kind: "tool_use",
             id: tool_use.id.0.to_string(),

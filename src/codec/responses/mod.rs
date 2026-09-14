@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::value::RawValue;
 
+use super::image::{decode_openai_image_url, encode_openai_image_url};
 use crate::codec::ProtocolCodec;
 use crate::ids::OpaqueKind;
 use crate::ir::{
@@ -353,10 +354,14 @@ fn decode_message_content(content: Option<MessageContentIn>) -> Result<Vec<Part>
                     "refusal" => Ok(Part::Text(parse_value::<RefusalPartIn>(&raw)?.refusal)),
                     "input_image" => {
                         let part: ImagePartIn = parse_value(&raw)?;
-                        Ok(Part::Image(ImageRef::Url(match part.image_url {
-                            ImageUrlIn::Url(url) => url.into_boxed_str(),
-                            ImageUrlIn::Object { url } => url.into_boxed_str(),
-                        })))
+                        let url = match part.image_url {
+                            ImageUrlIn::Url(url) => url,
+                            ImageUrlIn::Object { url } => url,
+                        };
+                        Ok(Part::Image(ImageRef {
+                            source: decode_openai_image_url(url)?,
+                            detail: None,
+                        }))
                     }
                     _ => Ok(Part::Opaque(Opaque {
                         kind: OpaqueKind::ProviderSpecific(RESPONSES_CONTENT_PART),
@@ -532,19 +537,11 @@ fn encode_input_part(role: Role, part: &Part) -> Result<Vec<Box<RawValue>>, Erro
                 "content": [{"type": content_type, "text": text}],
             }))?]
         }
-        Part::Image(ImageRef::Url(url)) => vec![raw_from_serializable(&serde_json::json!({
+        Part::Image(image) => vec![raw_from_serializable(&serde_json::json!({
             "type": "message",
             "role": "user",
-            "content": [{"type": "input_image", "image_url": url}],
+            "content": [{"type": "input_image", "image_url": encode_openai_image_url(&image.source)}],
         }))?],
-        Part::Image(ImageRef::Base64 { media_type, data }) => {
-            let url = format!("data:{media_type};base64,{data}");
-            vec![raw_from_serializable(&serde_json::json!({
-                "type": "message",
-                "role": "user",
-                "content": [{"type": "input_image", "image_url": url}],
-            }))?]
-        }
         Part::ToolUse(tool_use) => vec![raw_from_serializable(&serde_json::json!({
             "type": "function_call",
             "call_id": tool_use.id.0,
