@@ -63,7 +63,7 @@ impl ProtocolCodec for Responses {
             }
         }
 
-        let (mut system, turns) = decode_input(request.input)?;
+        let (mut system, turns) = decode_input(request.input, report)?;
         if let Some(instructions) = request.instructions {
             system.insert(0, Part::Text(instructions));
         }
@@ -229,7 +229,10 @@ impl DecodedItem {
     }
 }
 
-fn decode_input(input: Option<ResponsesInputIn>) -> Result<(Vec<Part>, Vec<Turn>), Error> {
+fn decode_input(
+    input: Option<ResponsesInputIn>,
+    report: &mut Report,
+) -> Result<(Vec<Part>, Vec<Turn>), Error> {
     let Some(input) = input else {
         return Ok((Vec::new(), Vec::new()));
     };
@@ -245,13 +248,22 @@ fn decode_input(input: Option<ResponsesInputIn>) -> Result<(Vec<Part>, Vec<Turn>
         ResponsesInputIn::Items(items) => {
             let mut system = Vec::new();
             let mut turns = Vec::new();
-            for item in items {
+            for (item_index, item) in items.into_iter().enumerate() {
                 match decode_item(item)? {
                     DecodedItem::User(parts) => push_turn_parts(&mut turns, Role::User, parts),
                     DecodedItem::Assistant(parts) => {
                         push_turn_parts(&mut turns, Role::Assistant, parts)
                     }
-                    DecodedItem::System(parts) => system.extend(parts),
+                    DecodedItem::System(parts) => {
+                        if !turns.is_empty() {
+                            report.warn(
+                                format!("request.input[{item_index}].role"),
+                                "late system message promoted to top-level system; position lost",
+                                Severity::Degraded,
+                            );
+                        }
+                        system.extend(parts);
+                    }
                 }
             }
             Ok((system, turns))
