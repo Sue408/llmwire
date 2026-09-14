@@ -88,7 +88,8 @@ pub(crate) struct RefusalPartIn {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImagePartIn {
-    pub image_url: ImageUrlIn,
+    pub image_url: Option<ImageUrlIn>,
+    pub file_id: Option<String>,
     pub detail: Option<String>,
 }
 

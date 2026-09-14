@@ -354,7 +354,15 @@ fn decode_message_content(content: Option<MessageContentIn>) -> Result<Vec<Part>
                     "refusal" => Ok(Part::Text(parse_value::<RefusalPartIn>(&raw)?.refusal)),
                     "input_image" => {
                         let part: ImagePartIn = parse_value(&raw)?;
-                        let (url, nested_detail) = match part.image_url {
+                        if part.file_id.is_some() {
+                            return Err(unsupported("responses image file_id"));
+                        }
+                        let image_url = part.image_url.ok_or_else(|| {
+                            Error::InvalidInput(
+                                "responses input_image missing image_url".to_owned(),
+                            )
+                        })?;
+                        let (url, nested_detail) = match image_url {
                             ImageUrlIn::Url(url) => (url, None),
                             ImageUrlIn::Object { url, detail } => (url, detail),
                         };

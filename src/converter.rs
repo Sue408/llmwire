@@ -228,52 +228,66 @@ impl ConverterImpl {
     }
 
     fn record_request_drops(&mut self, conversation: &Conversation) -> Result<(), Error> {
-        let mut fields = Vec::new();
+        let mut fields: Vec<String> = Vec::new();
+        let mut image_detail_fields: Vec<String> = Vec::new();
         let sampling = &conversation.sampling;
 
         if sampling.temperature.is_some() && !self.caps.supports(ParamSet::TEMPERATURE) {
-            fields.push("sampling.temperature");
+            fields.push("sampling.temperature".to_owned());
         }
         if sampling.top_p.is_some() && !self.caps.supports(ParamSet::TOP_P) {
-            fields.push("sampling.top_p");
+            fields.push("sampling.top_p".to_owned());
         }
         if sampling.top_k.is_some() && !self.caps.supports(ParamSet::TOP_K) {
-            fields.push("sampling.top_k");
+            fields.push("sampling.top_k".to_owned());
         }
         if sampling.max_output_tokens.is_some() && !self.caps.supports(ParamSet::MAX_OUTPUT_TOKENS)
         {
-            fields.push("sampling.max_output_tokens");
+            fields.push("sampling.max_output_tokens".to_owned());
         }
         if !sampling.stop.is_empty() && !self.caps.supports(ParamSet::STOP) {
-            fields.push("sampling.stop");
+            fields.push("sampling.stop".to_owned());
         }
         if sampling.seed.is_some() && !self.caps.supports(ParamSet::SEED) {
-            fields.push("sampling.seed");
+            fields.push("sampling.seed".to_owned());
         }
         if sampling.n.is_some_and(|n| n > 1) && !self.caps.supports(ParamSet::N) {
-            fields.push("sampling.n");
+            fields.push("sampling.n".to_owned());
         }
         if sampling.presence_penalty.is_some() && !self.caps.supports(ParamSet::PRESENCE_PENALTY) {
-            fields.push("sampling.presence_penalty");
+            fields.push("sampling.presence_penalty".to_owned());
         }
         if sampling.frequency_penalty.is_some() && !self.caps.supports(ParamSet::FREQUENCY_PENALTY)
         {
-            fields.push("sampling.frequency_penalty");
+            fields.push("sampling.frequency_penalty".to_owned());
         }
         if (conversation.reasoning.enabled
             || conversation.reasoning.effort.is_some()
             || conversation.reasoning.budget_tokens.is_some())
             && !self.caps.supports(ParamSet::REASONING)
         {
-            fields.push("reasoning");
+            fields.push("reasoning".to_owned());
         }
         if !conversation.tools.is_empty() && !self.caps.supports(ParamSet::TOOLS) {
-            fields.push("tools");
+            fields.push("tools".to_owned());
         }
         if !matches!(conversation.tool_choice, ToolChoice::Auto)
             && !self.caps.supports(ParamSet::TOOL_CHOICE)
         {
-            fields.push("tool_choice");
+            fields.push("tool_choice".to_owned());
+        }
+        if self.dst == ProtocolId::Messages {
+            for (turn_index, turn) in conversation.turns.iter().enumerate() {
+                for (part_index, part) in turn.parts.iter().enumerate() {
+                    if let Part::Image(image) = part {
+                        if image.detail.is_some() {
+                            image_detail_fields.push(format!(
+                                "request.messages[{turn_index}].content[{part_index}].detail"
+                            ));
+                        }
+                    }
+                }
+            }
         }
 
         let severity = if self.caps.mode == Mode::Strict {
@@ -283,14 +297,23 @@ impl ConverterImpl {
         };
 
         for field in &fields {
+            self.report.unmapped(
+                field.as_str(),
+                UnmappedReason::UnsupportedByTarget,
+                severity,
+            );
+        }
+        for field in &image_detail_fields {
             self.report
-                .unmapped(*field, UnmappedReason::UnsupportedByTarget, severity);
+                .unmapped(field.as_str(), UnmappedReason::NotRepresentable, severity);
         }
 
-        if severity == Severity::Fatal && !fields.is_empty() {
+        if severity == Severity::Fatal && (!fields.is_empty() || !image_detail_fields.is_empty()) {
+            let mut rejected = fields;
+            rejected.extend(image_detail_fields);
             return Err(Error::Unsupported(format!(
                 "strict mode rejected unsupported fields: {}",
-                fields.join(", ")
+                rejected.join(", ")
             )));
         }
 
