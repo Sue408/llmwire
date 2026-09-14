@@ -11,7 +11,7 @@
 | 里程碑 | 目标 | 状态 |
 |---|---|---|
 | **M0** | crate 骨架 + `ir` + `chat` codec（非流式双向） | M0-3 完成 |
-| **M1** | `messages` codec + `caps`/`resolve`（非流式双向） | 未开始 |
+| **M1** | `messages` codec + `caps`/`resolve`（非流式双向） | M1-3 完成 |
 | **M2** | `framing` + 流式 FSM + `Converter` 门面（流式双向） | 未开始 |
 | **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | 未开始 |
 | **M4** | `StaticHost` + `Report` 全链路 + 契约测试 | 未开始 |
@@ -158,6 +158,13 @@ Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端
 - 不变量: 全部
 - AC: 契约清单全绿
 - 验证: `cargo test -p llmwire`
+
+### M4-4 Live compatibility matrix
+- 文档锚点: `TESTING.md §7`，`DESIGN.md §10`
+- 要动: `tests/live_*.rs`, `.env.example`, `TESTING.md`
+- 不变量: INV-3、INV-4、INV-5
+- AC: 默认全 `ignored`；缺配置不访问网络；Chat / Messages / Responses 各有 smoke；覆盖 tool id、thinking、cache_control、usage 与流式终止；核心依赖不新增 HTTP/async runtime
+- 验证: `cargo test -p llmwire --test live_chat -- --ignored --nocapture` 及对应 live tests
 
 ---
 
