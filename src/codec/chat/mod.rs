@@ -10,6 +10,7 @@ use crate::ir::{
     ReasoningEffort, Role, Sampling, StopReason, ToolChoice, ToolDef, ToolId, ToolResult,
     ToolResultContent, ToolUse, ToolUseKind, Turn, Usage,
 };
+use crate::report::{Report, Severity};
 use crate::Error;
 use wire::*;
 
@@ -18,6 +19,14 @@ pub struct Chat;
 
 impl ProtocolCodec for Chat {
     fn decode_request(&self, body: &[u8]) -> Result<Conversation, Error> {
+        self.decode_request_with_report(body, &mut Report::new())
+    }
+
+    fn decode_request_with_report(
+        &self,
+        body: &[u8],
+        report: &mut Report,
+    ) -> Result<Conversation, Error> {
         let request: ChatRequestIn = parse_json(body)?;
         let ChatRequestIn {
             messages,
@@ -34,6 +43,14 @@ impl ProtocolCodec for Chat {
             frequency_penalty,
             reasoning_effort,
         } = request;
+
+        if max_tokens.is_some() && max_completion_tokens.is_none() {
+            report.warn(
+                "request.max_tokens",
+                "max_tokens is a deprecated alias; mapped as max_output_tokens",
+                Severity::Degraded,
+            );
+        }
 
         let (system, turns) = decode_messages(messages)?;
         Ok(Conversation {
