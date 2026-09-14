@@ -20,12 +20,6 @@ pub fn converter(
     dst: ProtocolId,
     caps: Capabilities,
 ) -> Result<Box<dyn Converter>, Error> {
-    if src == ProtocolId::Responses || dst == ProtocolId::Responses {
-        return Err(Error::Unsupported(
-            "responses codec is not implemented".to_owned(),
-        ));
-    }
-
     Ok(Box::new(ConverterImpl {
         src,
         dst,
@@ -234,7 +228,7 @@ fn codec_for(protocol: ProtocolId) -> Box<dyn ProtocolCodec> {
     match protocol {
         ProtocolId::Chat => Box::new(crate::codec::Chat),
         ProtocolId::Messages => Box::new(crate::codec::Messages),
-        ProtocolId::Responses => unreachable!("responses codec checked by converter factory"),
+        ProtocolId::Responses => Box::new(crate::codec::Responses),
     }
 }
 
