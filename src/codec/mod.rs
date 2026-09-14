@@ -1,6 +1,8 @@
 mod chat;
+mod messages;
 
 pub use chat::Chat;
+pub use messages::Messages;
 
 use crate::ir::{AssistantOutput, Conversation};
 use crate::Error;
