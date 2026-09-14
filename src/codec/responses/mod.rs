@@ -27,10 +27,14 @@ impl ProtocolCodec for Responses {
     fn decode_request(&self, body: &[u8]) -> Result<Conversation, Error> {
         let request: ResponsesRequestIn = parse_json(body)?;
         if request.store == Some(true) {
-            return Err(unsupported("responses store=true"));
+            return Err(unsupported(
+                "responses store=true is not supported in stateless mode",
+            ));
         }
         if request.previous_response_id.is_some() {
-            return Err(unsupported("responses previous_response_id"));
+            return Err(unsupported(
+                "responses previous_response_id is not supported in stateless mode",
+            ));
         }
         if let Some(max_output_tokens) = request.max_output_tokens {
             if max_output_tokens < 16 {
