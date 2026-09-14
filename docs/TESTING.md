@@ -151,3 +151,13 @@ LLMWIRE_LIVE_RESPONSES_MODEL=
 | Matrix | 多端点支持度记录 | 官方端点、本地网关、兼容端点的差异与已知限制 |
 
 Live 测试只断言协议契约与不变量，不断言模型输出文本。网络错误、429、超时等属于 host 传输层，不得混入 codec 的正常完成语义。
+
+### 7.3 当前验证矩阵
+
+| 协议 | 端点 | 模型 | 验证结果 |
+|---|---|---|---|
+| Chat | 本地网关 | `deepseek-flash-offical` | 非流式、流式显式终止通过 |
+| Messages | 本地网关 | `claude-haiku-4-5` | 非流式、cache_control、usage、thinking/signature 通过 |
+| Responses | 本地网关 | `gpt-4.6-luna` | 非流式、function_call id、流式 `response.completed` 通过 |
+
+Responses 真实验证暴露了 `reasoning_text` 与 `encrypted_content` 共存的事件序列；实现已修正为同一 reasoning item 中分别保留明文 thinking 与加密 opaque。

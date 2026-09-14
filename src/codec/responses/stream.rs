@@ -96,7 +96,7 @@ pub(super) fn decode_stream_frame(
                 }]
             }
         }
-        "response.reasoning_summary_text.delta" | "response.reasoning_text.delta" => {
+        "response.reasoning_summary_text.delta" => {
             let index = summary_index(&value)?;
             let text = string_field(&value, "delta")?;
             vec![Event::PartDelta {
@@ -104,8 +104,24 @@ pub(super) fn decode_stream_frame(
                 delta: Delta::Thinking(text.into()),
             }]
         }
-        "response.reasoning_summary_text.done" | "response.reasoning_text.done" => {
+        "response.reasoning_text.delta" => {
+            let index = part_index(&value, "content_index")?;
+            let text = string_field(&value, "delta")?;
+            vec![Event::PartDelta {
+                index,
+                delta: Delta::Thinking(text.into()),
+            }]
+        }
+        "response.reasoning_summary_text.done" => {
             let index = summary_index(&value)?;
+            if state.is_open(index) {
+                vec![Event::PartStop { index }]
+            } else {
+                Vec::new()
+            }
+        }
+        "response.reasoning_text.done" => {
+            let index = part_index(&value, "content_index")?;
             if state.is_open(index) {
                 vec![Event::PartStop { index }]
             } else {
@@ -264,40 +280,7 @@ fn decode_output_item_added(value: &Value, state: &StreamState) -> Result<Vec<Ev
                 }),
             }])
         }
-        "reasoning" => {
-            let index = response_index(output_index, 0);
-            if state.part_index_used(index) {
-                return Ok(Vec::new());
-            }
-            let encrypted = item.get("encrypted_content").and_then(Value::as_str);
-            let summary_empty = item
-                .get("summary")
-                .and_then(Value::as_array)
-                .map(Vec::is_empty)
-                .unwrap_or(true);
-            if let Some(encrypted) = encrypted.filter(|_| summary_empty) {
-                Ok(vec![
-                    Event::PartStart {
-                        index,
-                        kind: PartKind::Opaque(OpaqueKind::ResponsesEncryptedReasoning),
-                        tool: None,
-                    },
-                    Event::PartDelta {
-                        index,
-                        delta: Delta::Opaque(Opaque {
-                            kind: OpaqueKind::ResponsesEncryptedReasoning,
-                            bytes: encrypted.as_bytes().to_vec().into_boxed_slice(),
-                        }),
-                    },
-                ])
-            } else {
-                Ok(vec![Event::PartStart {
-                    index,
-                    kind: PartKind::Thinking,
-                    tool: None,
-                }])
-            }
-        }
+        "reasoning" => Ok(Vec::new()),
         _ => {
             let index = response_index(output_index, 0);
             if state.part_index_used(index) {
@@ -454,9 +437,9 @@ fn message_text(item: &Value) -> String {
 }
 
 fn reasoning_text(item: &Value) -> String {
-    item.get("summary")
-        .and_then(Value::as_array)
+    ["summary", "content"]
         .into_iter()
+        .filter_map(|field| item.get(field).and_then(Value::as_array))
         .flatten()
         .filter_map(|part| part.get("text").and_then(Value::as_str))
         .collect::<Vec<_>>()
@@ -472,7 +455,7 @@ fn decode_content_part_added(value: &Value, state: &StreamState) -> Result<Vec<E
         .get("part")
         .ok_or_else(|| Error::InvalidInput("content_part.added missing part".to_owned()))?;
     let kind = match part.get("type").and_then(Value::as_str) {
-        Some("refusal") => PartKind::Text,
+        Some("reasoning_text") => PartKind::Thinking,
         _ => PartKind::Text,
     };
     Ok(vec![Event::PartStart {
