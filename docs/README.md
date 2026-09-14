@@ -1,0 +1,95 @@
+# llmwire 文档总览
+
+> 状态：活跃　|　最后更新：2026-09-14
+> 本文件是文档体系的**地图与规则**。不知道读哪份时，先读这里。
+
+## 1. 为什么这样分层
+
+文档按**变更频率 + 读者**分层，而不是按内容主题堆叠。原因：agent 每次只加载少量上下文，一旦多份文档内容重叠，就会在冲突处"猜"，而猜错比不会更贵。
+
+- **稳定层**（少改）：`DESIGN.md` —— 定位、架构、模块边界、公开 API。
+- **半稳定层**（随协议演进）：`spec/*.md` —— IR 类型、流式模型、各协议字段映射。
+- **活跃层**（高频更新）：`PLAN.md` —— 里程碑、进度、验收。
+- **决策层**（只增不改）：`decisions/*.md` —— ADR，回答"为什么"。
+- **证据层**（冻结）：`reference/*` —— 协议一手资料，只作证据，不回改成规范。
+- **废弃层**：`archive/*` —— 历史提案，不权威。
+
+**单一事实来源**：协议字段细节只存在于 `spec/`；`DESIGN.md` 只能引用、不得复制。`reference/` 不得被改写成规范，规范以 `spec/` 为准。
+
+## 2. 文档清单与状态
+
+| 文件 | 状态 | 读者 | 说明 |
+|---|---|---|---|
+| `../AGENTS.md` | 活跃 | 所有 agent | 第一入口：命令 + 文档地图 + 优先级 |
+| `DESIGN.md` | 冻结-稳定 | 架构/实现 | 正式项目设计：定位、架构、API、不变量、陷阱 |
+| `spec/IR.md` | 半稳定 | codec 实现者 | IR 规范：类型、canonical form、IR 级不变量 |
+| `spec/STREAMING.md` | 半稳定 | 流式实现者 | 内部事件集、FSM、`feed`/`finish`、终止语义 |
+| `spec/chat.md` | 半稳定 | chat codec | OpenAI Chat ↔ IR 双向映射 + 陷阱 + 用例 |
+| `spec/messages.md` | 半稳定 | messages codec | Anthropic Messages ↔ IR 双向映射 + 陷阱 + 用例 |
+| `spec/responses.md` | 半稳定 | responses codec | OpenAI Responses ↔ IR 双向映射 + 陷阱 + 用例 |
+| `PLAN.md` | 活跃 | 接任务者 | M0–M4 里程碑与任务块、验收标准 |
+| `TESTING.md` | 半稳定 | 写测试者 | 测试策略 + 契约清单索引 |
+| `decisions/000*.md` | 冻结 | 想推翻决策者 | ADR：为什么这么定 |
+| `reference/*` | 冻结 | 查证者 | 协议深度研究报告、同类项目分析报告 |
+| `archive/*` | 已废弃 | 追溯者 | v0.1 设计提案，勿据此实现 |
+
+## 3. 阅读路径
+
+- **总体把握**：`../AGENTS.md` → `DESIGN.md` → `PLAN.md`
+- **实现任一 codec**：`spec/IR.md` → `spec/STREAMING.md` → `spec/<protocol>.md`
+- **改流式**：`spec/STREAMING.md` → `DESIGN.md §6、§8`
+- **接任务**：`PLAN.md` → 该任务"文档锚点"列出的章节
+- **想推翻某设计**：`decisions/<对应 ADR>.md`
+
+## 4. 权威优先级（冲突时）
+
+1. 结构 / 架构 / API → `DESIGN.md`
+2. 字段映射 / 语义 → `spec/*.md`
+3. 决策缘由 → `decisions/*.md`
+4. 协议一手证据 → `reference/*`
+5. 历史提案 → `archive/*`（最低）
+
+## 5. 写作规范
+
+- 正文用简体中文；类型名、字段名、命令用英文原文。
+- 每份文档顶部写 **状态 + 最后更新**。
+- 不复制别处内容；用相对路径交叉引用。
+- 编号约定：不变量 `INV-n`、陷阱 `TRAP-n`、验收标准 `AC-n`、里程碑 `M<阶段>-<序号>`。
+- 规范句要**可执行**：能被直接转成测试的断言，优于形容词。
+
+## 6. 文档地图
+
+```text
+llmwire/
+├── AGENTS.md                     # agent 入口
+└── docs/
+    ├── README.md                 # 本文件
+    ├── DESIGN.md                 # 正式项目设计
+    ├── PLAN.md                   # 里程碑与任务
+    ├── TESTING.md                # 测试策略
+    ├── spec/
+    │   ├── IR.md
+    │   ├── STREAMING.md
+    │   ├── chat.md
+    │   ├── messages.md
+    │   └── responses.md
+    ├── decisions/
+    │   ├── 0001-bytes-seam.md
+    │   ├── 0002-request-level-object.md
+    │   ├── 0003-report-first-class.md
+    │   ├── 0004-send-not-sync.md
+    │   └── 0005-independent-ir.md
+    ├── reference/
+    │   ├── LLM接口协议格式深度研究报告.md
+    │   └── LLM协议转换分析报告.md
+    └── archive/
+        └── llmwire_Rust协议转换SDK设计提案.md
+```
+
+## 7. 已知冲突
+
+> 发现文档冲突时，按 §4 裁决，并在此登记一条。**不要私自在实现里选边。**
+
+| 日期 | 冲突点 | 裁决依据 | 处理 |
+|---|---|---|---|
+| — | （暂无） | — | — |
