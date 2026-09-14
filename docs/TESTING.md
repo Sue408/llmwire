@@ -108,3 +108,22 @@ cargo insta review                              # 快照审阅
 - 对 `arguments` 在 `PartStop`/`Finish` 之前 `parse`（违反 `STREAMING.md` STR-3）。
 - 把流式的一次性网络错误当作"正常完成"（违反 `STREAMING.md §5`）。
 - 测试里放行静默丢弃（违反 INV-3）——应断言 `Report` 有对应条目。
+
+## 7. Live API smoke
+
+M0-3 的真 API 冒烟测试默认标记为 `ignored`，配置从项目根目录的 `.env` 读取。
+
+```powershell
+Copy-Item .env.example .env
+cargo test -p llmwire --test live_chat -- --ignored --nocapture
+```
+
+`.env` 至少需要：
+
+```dotenv
+LLMWIRE_LIVE_CHAT_URL=https://api.openai.com/v1/chat/completions
+LLMWIRE_LIVE_CHAT_API_KEY=...
+LLMWIRE_LIVE_CHAT_MODEL=...
+```
+
+`.env` 不进入版本控制；`.env.example` 仅保存空 key 和默认端点。
