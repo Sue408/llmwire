@@ -282,3 +282,87 @@ pub(crate) struct PromptTokensDetailsOut {
 pub(crate) struct CompletionTokensDetailsOut {
     pub reasoning_tokens: u64,
 }
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatChunkIn {
+    pub id: Option<String>,
+    pub model: Option<String>,
+    #[serde(default)]
+    pub choices: Vec<ChatChunkChoiceIn>,
+    pub usage: Option<UsageIn>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatChunkChoiceIn {
+    pub index: u32,
+    pub delta: Option<ChatDeltaIn>,
+    pub finish_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub(crate) struct ChatDeltaIn {
+    pub content: Option<String>,
+    pub tool_calls: Option<Vec<ChatToolCallDeltaIn>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatToolCallDeltaIn {
+    pub index: u32,
+    pub id: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: Option<String>,
+    pub function: Option<ChatFunctionCallDeltaIn>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ChatFunctionCallDeltaIn {
+    pub name: Option<String>,
+    pub arguments: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ChatChunkOut {
+    pub id: String,
+    pub object: &'static str,
+    pub created: u64,
+    pub model: String,
+    pub choices: Vec<ChatChunkChoiceOut>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<UsageOut>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ChatChunkChoiceOut {
+    pub index: u32,
+    pub delta: ChatDeltaOut,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finish_reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Default)]
+pub(crate) struct ChatDeltaOut {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ChatToolCallDeltaOut>>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ChatToolCallDeltaOut {
+    pub index: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<&'static str>,
+    pub function: ChatFunctionCallDeltaOut,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct ChatFunctionCallDeltaOut {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<String>,
+}

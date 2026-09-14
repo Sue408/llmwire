@@ -23,12 +23,33 @@ llmwire 初版只覆盖前三种，但内部事件集按五路设计。
 ## 2. 内部事件集
 
 ```rust
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolStart {
+    pub source_index: Option<u32>,
+    pub id: ToolId,
+    pub name: Box<str>,
+    pub kind: ToolUseKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct UsagePatch {
+    pub input: Option<u64>,
+    pub output: Option<u64>,
+    pub cached: Option<u64>,
+    pub cache_creation: Option<u64>,
+    pub reasoning: Option<u64>,
+}
+
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum Event {
     MessageStart { id: Box<str>, model: Box<str> },
     /// block 边界。OpenAI 无此概念，由 codec 合成；Claude 原生具备。
-    PartStart { index: usize, kind: PartKind },
+    PartStart {
+        index: usize,
+        kind: PartKind,
+        tool: Option<ToolStart>,
+    },
     PartDelta { index: usize, delta: Delta },
     PartStop  { index: usize },
     /// 增量补丁：字段为 None 表示"该维度尚未知"，可被后续补丁覆盖。

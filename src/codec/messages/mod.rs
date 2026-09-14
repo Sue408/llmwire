@@ -1,3 +1,4 @@
+mod stream;
 mod wire;
 
 use std::str;
@@ -143,8 +144,22 @@ impl ProtocolCodec for Messages {
 
         serialize_json(&response)
     }
-}
+    fn decode_stream_frame(
+        &self,
+        frame: &crate::framing::SseFrame,
+        state: &crate::ir::StreamState,
+    ) -> Result<crate::codec::StreamDecode, Error> {
+        stream::decode_stream_frame(frame, state)
+    }
 
+    fn encode_stream_event(
+        &self,
+        event: &crate::ir::Event,
+        state: &crate::ir::StreamState,
+    ) -> Result<Vec<crate::framing::SseFrame>, Error> {
+        stream::encode_stream_event(event, state)
+    }
+}
 fn decode_message(message: MessageIn) -> Result<Turn, Error> {
     let role = match message.role.as_str() {
         "user" => Role::User,

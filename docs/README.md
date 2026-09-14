@@ -100,3 +100,5 @@ llmwire/
 | 2026-09-14 | `ImageRef` 被引用但未定义 | `spec/IR.md §3` 核心类型完整性 | 补充 `Url` / `Base64` 两态；已处理 |
 | 2026-09-14 | `Opaque` 派生 `Debug` 会暴露 bytes，违背 INV-4 | `DESIGN.md` INV-4 优先 | 改为手写 `Debug`，仅输出 `kind + len`；已处理 |
 | 2026-09-14 | IR-INV-USAGE-2 正向公式漏减 cache_creation，与反向公式和包含关系注释冲突 | IR.md §8 的可逆 round-trip 要求 | 正向改为同时减去 cached / cache_creation；已处理 |
+| 2026-09-14 | 流式 `PartStart` 缺少 tool id/name/kind，Messages/Chat 工具调用跨协议时无法无损转换 | `spec/STREAMING.md` 事件集需满足 INV-3、IR-INV-TOOL-1 | 在 `PartStart` 增加可选 `ToolStart` 元数据；已处理 |
+| 2026-09-14 | Chat 流式 `n>1` 需要 choice 维度，但 `Event` 集只有 block index | `spec/chat.md CHAT-TRAP-4`、`IR-INV-N-1` | 当前显式 `Unsupported`，不静默退化；choice 元数据扩展留待后续任务 |
