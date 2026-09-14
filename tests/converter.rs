@@ -167,17 +167,47 @@ mod converter {
     }
 
     #[test]
-    fn responses_protocol_is_explicitly_unsupported() {
-        let error = match converter(
+    fn responses_protocol_non_stream_is_supported() {
+        let mut converter = converter(
             ProtocolId::Chat,
             ProtocolId::Responses,
             resolve(ProtocolId::Chat, ProtocolId::Responses, "gpt-test"),
-        ) {
-            Ok(_) => panic!("responses should be unsupported"),
-            Err(error) => error,
-        };
+        )
+        .unwrap();
 
-        assert!(matches!(error, Error::Unsupported(_)));
+        let request = serde_json::json!({
+            "model": "gpt-test",
+            "messages": [{"role": "user", "content": "hello"}],
+            "max_completion_tokens": 32
+        })
+        .to_string()
+        .into_bytes();
+        let mut outbound = Vec::new();
+        converter.request(&request, &mut outbound).unwrap();
+        let outbound_json: serde_json::Value = serde_json::from_slice(&outbound).unwrap();
+        assert_eq!(outbound_json["input"][0]["type"], "message");
+        assert_eq!(
+            outbound_json["input"][0]["content"][0]["type"],
+            "input_text"
+        );
+
+        let response = br#"{
+            "id":"resp_1",
+            "object":"response",
+            "status":"completed",
+            "model":"gpt-test",
+            "output":[{
+                "type":"message",
+                "id":"msg_1",
+                "role":"assistant",
+                "status":"completed",
+                "content":[{"type":"output_text","text":"hi","annotations":[]}]
+            }]
+        }"#;
+        let mut inbound = Vec::new();
+        converter.response(response, &mut inbound).unwrap();
+        let inbound_json: serde_json::Value = serde_json::from_slice(&inbound).unwrap();
+        assert_eq!(inbound_json["choices"][0]["message"]["content"], "hi");
     }
 
     #[test]

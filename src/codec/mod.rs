@@ -1,8 +1,10 @@
 mod chat;
 mod messages;
+mod responses;
 
 pub use chat::Chat;
 pub use messages::Messages;
+pub use responses::Responses;
 
 use crate::framing::SseFrame;
 use crate::ir::{AssistantOutput, Conversation, Event, StreamState, Termination};
