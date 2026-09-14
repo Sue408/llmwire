@@ -81,7 +81,7 @@ Chat 流：单 `data:` JSON chunk，末 `data: [DONE]`。
 | 内部事件 | Chat chunk |
 |---|---|
 | `MessageStart` | 首 chunk（带 `delta.role:"assistant"`） |
-| `PartStart{Text}` | 首个非空 `delta.content` 前**合成** |
+| `PartStart{Text}` | 首个出现 `delta.content` 字段的 chunk 前**合成**（空字符串也算出现） |
 | `PartDelta::Text` | `delta.content` |
 | `PartStart{ToolUse}` | `delta.tool_calls[i]` 首现（含 `id`/`type`/`function.name`） |
 | `PartDelta::ToolArguments` | `delta.tool_calls[i].function.arguments` 分片 |

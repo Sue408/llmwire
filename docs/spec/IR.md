@@ -142,7 +142,7 @@ pub enum ToolResultContent {
     Object(RawJson),               // Gemini functionResponse.response 为对象
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ToolUseKind {
     Client,                            // 客户端执行（OpenAI function / Claude tool_use）
     Server,                            // 服务端内置（Claude srvtoolu_ / web_search…）

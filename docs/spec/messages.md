@@ -76,11 +76,11 @@ Messages SSE 事件序列：`message_start → content_block_start → content_b
 | Messages 事件 | 内部事件 |
 |---|---|
 | `message_start` | `MessageStart` + `UsagePatch{input}`（此刻 input 已知，见 `STREAMING.md §7`） |
-| `content_block_start`（`text`/`tool_use`/`thinking`） | `PartStart{kind}` + （tool_use 时带 id/name） |
+| `content_block_start`（`text`/`tool_use`/`thinking`/`redacted_thinking`） | `PartStart{index,kind}`；`redacted_thinking` 用 `PartKind::Opaque(AnthropicRedactedThinking)`，tool_use 时带 id/name |
 | `content_block_delta.type:"text_delta"` | `PartDelta::Text` |
 | `content_block_delta.type:"thinking_delta"` | `PartDelta::Thinking` |
 | `content_block_delta.type:"input_json_delta"` | `PartDelta::ToolArguments`（`partial_json`） |
-| `content_block_delta.type:"signature_delta"` | `PartDelta` → `Opaque` 追加 |
+| `content_block_delta.type:"signature_delta"` | `PartDelta::Opaque(Opaque{AnthropicThinkingSignature, ..})` |
 | `content_block_stop` | `PartStop` |
 | `message_delta` | `UsagePatch{output}` + `Finish`（`stop_reason`） |
 | `message_stop` | `Finish` 终止 / `Termination::Explicit` |

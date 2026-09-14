@@ -80,7 +80,7 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 | Responses 事件 | 内部事件 |
 |---|---|
 | `response.created` | `MessageStart` |
-| `response.output_item.added` | `PartStart`（`item` 类型决定 `PartKind`） |
+| `response.output_item.added` | `PartStart`（`item` 类型决定 `PartKind`；Opaque item 使用 `PartKind::Opaque(OpaqueKind)`） |
 | `response.content_part.added` | `PartStart` |
 | `response.output_text.delta` | `PartDelta::Text` |
 | `response.refusal.delta` | `PartDelta::Text`（+ `Report`） |
@@ -88,10 +88,10 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 | `response.function_call_arguments.delta` | `PartDelta::ToolArguments` |
 | `response.output_text.done` / `*.done` | `PartStop` |
 | `response.completed` | `UsagePatch` + `Finish` + `Termination::Explicit` |
-| `response.incomplete` | `Finish{MultipleCandidates/incomplete}` + `Report`（**非成功**） |
+| `response.incomplete` | `Finish{MaxTokens/ContentFilter/Other}` + `Report`（按 `incomplete_details.reason` 映射，**非成功**） |
 | `response.failed` | `Event::Error` |
 | `error` | `Event::Error`（信道 B） |
-| 内置工具事件（`web_search_call.*` 等） | `Event::Opaque` 透传 / 记 `Report` |
+| 内置工具事件（`web_search_call.*` 等） | `PartStart` + `PartDelta::Opaque` + `PartStop` 透传 / 记 `Report` |
 
 ## 5. status 映射
 
@@ -100,6 +100,7 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 | `completed` | `EndTurn`（若末 item 为 function_call 则 `ToolUse`） |
 | `incomplete`（`max_output_tokens`） | `MaxTokens` |
 | `incomplete`（`content_filter`） | `ContentFilter` |
+| `incomplete`（其它 reason） | `Other(raw)` + `Report` |
 | `cancelled` | `Cancelled` |
 | `failed` | 错误，非 `Finish` |
 | `queued` / `in_progress` | 中间态，不得映射为成功 |

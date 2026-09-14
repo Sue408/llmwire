@@ -125,7 +125,7 @@ llmwire/
 ├── Cargo.toml
 └── src/
     ├── lib.rs
-    ├── ids.rs          # ProtocolId / PartKind / OpaqueKind
+    ├── ids.rs          # ProtocolId / OpaqueKind
     ├── error.rs        # Error（thiserror）
     ├── report.rs       # Report / Unmapped / Warning / Severity / UnmappedReason
     ├── caps.rs         # Capabilities / ThinkingPolicy / ToolIdPolicy / ParamSet(bitflags)

@@ -84,8 +84,8 @@ Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端
 ### M2-2 事件与 FSM
 - 文档锚点: `spec/STREAMING.md §2、§3`
 - 要动: `src/ir/{event,state}.rs`
-- 不变量: STR-1、STR-2、STR-3
-- AC: block 只在 `PartStart` 创建；`arguments` 仅在 stop/finish 后解析
+- 不变量: STR-1、STR-2、STR-3、STR-7
+- AC: block 只在 `PartStart` 创建；`arguments` 仅在 stop/finish 后解析；Opaque delta 只能追加到已开启 block
 - 验证: `cargo test -p llmwire state`
 
 ### M2-3 Chat 流式

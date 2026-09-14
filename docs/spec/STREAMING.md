@@ -39,7 +39,13 @@ pub enum Event {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum PartKind { Text, Thinking, ToolUse, ToolResult, Opaque }
+pub enum PartKind {
+    Text,
+    Thinking,
+    ToolUse,
+    ToolResult,
+    Opaque(OpaqueKind),
+}
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -48,12 +54,14 @@ pub enum Delta {
     Thinking(Box<str>),
     /// JSON 字符串片段：任意边界、可能不闭合、可能为空
     ToolArguments(Box<str>),
+    /// Opaque 原始字节片段。不得解码、重编码、压缩或摘要。
+    Opaque(Opaque),
 }
 ```
 
 **一对多是常态**：一个上游事件可展开成多个内部事件，反之亦然。故 codec 的 `decode_event` 返回 `Vec<Event>`。
 
-**`PartStart`/`PartStop` 是必需的，不是优化**：OpenAI 没有 block 边界概念，但 IR 站在细粒度一侧，故 OpenAI 侧由 codec **合成**（首个非空 `delta.content` 时 start，`finish_reason` 时 stop）。合成比凭空恢复可靠。
+**`PartStart`/`PartStop` 是必需的，不是优化**：OpenAI 没有 block 边界概念，但 IR 站在细粒度一侧，故 OpenAI 侧由 codec **合成**（首个出现 `delta.content` 字段的 chunk 时 start，空字符串也算出现；`finish_reason` 时 stop）。合成比凭空恢复可靠。
 
 ## 3. 状态机
 
@@ -66,16 +74,19 @@ pub struct StreamState {
 }
 
 enum BlockState {
-    Open { index: usize, kind: PartKind },
+    Open { index: usize, kind: PartKind, opaque_buf: Vec<u8> },
     Closed { index: usize },
 }
 ```
 
-### 三条硬规则
+`Open.opaque_buf` 统一承接 `Delta::Opaque`：`PartKind::Opaque` 时成为最终 `Opaque.bytes`，`PartKind::Thinking` 时成为最终 `Thinking.signature.bytes`。
+
+### 硬规则
 
 - **STR-1**：**只能在 `PartStart` 时创建 block**，不得在收到任意 delta 时临时创建。（LiteLLM #17254 的尾随 `{}` 即违反此条。）
 - **STR-2**：并行工具调用靠 `index` 区分，不得靠字符串拼接结果反推。
 - **STR-3**：`arguments` 只做字符串累加，**绝不在中途 `parse`**。只有 `PartStop` 或 `Finish` 之后才允许解析。切割点可能落在 `\"` 转义符或 `{}` 中间。
+- **STR-7**：`Delta::Opaque(Opaque)` 只能追加到已打开的 block。目标为 `PartKind::Opaque(kind)` 时必须同 kind；目标为 `PartKind::Thinking` 时只接受 `AnthropicThinkingSignature`；其它情况返回协议错误。字节不得解码、重编码、压缩或摘要。
 
 ## 4. feed / finish 语义
 
