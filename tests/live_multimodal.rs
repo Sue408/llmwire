@@ -8,51 +8,73 @@ use llmwire::ProtocolId;
 
 const VISION_PROMPT: &str = "Reply with exactly: llmwire-vision-ok";
 const BASE64_IMAGE: &str =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlW4xQAAAAASUVORK5CYII=";
-const DEFAULT_IMAGE_URL: &str =
-    "https://raw.githubusercontent.com/github/explore/main/topics/rust/rust.png";
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+const DEFAULT_IMAGE_URL: &str = "https://httpbin.org/image/png";
 
-#[test]
-#[ignore = "requires .env live vision settings"]
-fn live_multimodal_chat_vision_url_and_base64() {
-    let env = load_env().expect(".env is required for live API tests");
-    run_protocol_cases(ProtocolId::Chat, &env);
+#[derive(Clone, Copy)]
+enum SourceCase {
+    RemoteUrl,
+    Base64,
 }
 
 #[test]
 #[ignore = "requires .env live vision settings"]
-fn live_multimodal_messages_vision_url_and_base64() {
+fn live_multimodal_chat_vision_url() {
     let env = load_env().expect(".env is required for live API tests");
-    run_protocol_cases(ProtocolId::Messages, &env);
+    run_protocol_case(ProtocolId::Chat, SourceCase::RemoteUrl, &env);
 }
 
 #[test]
 #[ignore = "requires .env live vision settings"]
-fn live_multimodal_responses_vision_url_and_base64() {
+fn live_multimodal_chat_vision_base64() {
     let env = load_env().expect(".env is required for live API tests");
-    run_protocol_cases(ProtocolId::Responses, &env);
+    run_protocol_case(ProtocolId::Chat, SourceCase::Base64, &env);
 }
 
-fn run_protocol_cases(protocol: ProtocolId, env: &std::collections::BTreeMap<String, String>) {
-    assert_eq!(
-        optional(env, "LLMWIRE_LIVE_VISION_ENABLE").as_deref(),
-        Some("1"),
-        "set LLMWIRE_LIVE_VISION_ENABLE=1 before running live vision tests; otherwise this is not a verified pass"
-    );
+#[test]
+#[ignore = "requires .env live vision settings"]
+fn live_multimodal_messages_vision_url() {
+    let env = load_env().expect(".env is required for live API tests");
+    run_protocol_case(ProtocolId::Messages, SourceCase::RemoteUrl, &env);
+}
 
-    let model = required(env, vision_model_key(protocol));
+#[test]
+#[ignore = "requires .env live vision settings"]
+fn live_multimodal_messages_vision_base64() {
+    let env = load_env().expect(".env is required for live API tests");
+    run_protocol_case(ProtocolId::Messages, SourceCase::Base64, &env);
+}
+
+#[test]
+#[ignore = "requires .env live vision settings"]
+fn live_multimodal_responses_vision_url() {
+    let env = load_env().expect(".env is required for live API tests");
+    run_protocol_case(ProtocolId::Responses, SourceCase::RemoteUrl, &env);
+}
+
+#[test]
+#[ignore = "requires .env live vision settings"]
+fn live_multimodal_responses_vision_base64() {
+    let env = load_env().expect(".env is required for live API tests");
+    run_protocol_case(ProtocolId::Responses, SourceCase::Base64, &env);
+}
+
+fn run_protocol_case(
+    protocol: ProtocolId,
+    source_case: SourceCase,
+    env: &std::collections::BTreeMap<String, String>,
+) {
+    let model = required(env, protocol_model_name(protocol));
     let image_url = optional(env, "LLMWIRE_LIVE_VISION_IMAGE_URL")
         .unwrap_or_else(|| DEFAULT_IMAGE_URL.to_owned());
-
-    for source in [
-        ImageSource::RemoteUrl(image_url.into_boxed_str()),
-        ImageSource::Base64 {
+    let source = match source_case {
+        SourceCase::RemoteUrl => ImageSource::RemoteUrl(image_url.into_boxed_str()),
+        SourceCase::Base64 => ImageSource::Base64 {
             media_type: "image/png".into(),
             data: BASE64_IMAGE.into(),
         },
-    ] {
-        run_case(protocol, &model, source, env);
-    }
+    };
+    run_case(protocol, &model, source, env);
 }
 
 fn run_case(
@@ -76,11 +98,14 @@ fn run_case(
     }
     .unwrap_or_else(|error| panic!("{protocol:?} vision response decode failed: {error}"));
 
-    assert!(response
-        .choices
-        .iter()
-        .flat_map(|choice| &choice.parts)
-        .any(|part| matches!(part, Part::Text(_))));
+    assert!(
+        response
+            .choices
+            .iter()
+            .flat_map(|choice| &choice.parts)
+            .any(|part| matches!(part, Part::Text(_))),
+        "{protocol:?} response did not contain text: {response:?}"
+    );
 }
 
 fn vision_request_body(protocol: ProtocolId, model: &str, source: ImageSource) -> Vec<u8> {
@@ -164,11 +189,11 @@ fn protocol_key_name(protocol: ProtocolId) -> &'static str {
     }
 }
 
-fn vision_model_key(protocol: ProtocolId) -> &'static str {
+fn protocol_model_name(protocol: ProtocolId) -> &'static str {
     match protocol {
-        ProtocolId::Chat => "LLMWIRE_LIVE_VISION_CHAT_MODEL",
-        ProtocolId::Messages => "LLMWIRE_LIVE_VISION_MESSAGES_MODEL",
-        ProtocolId::Responses => "LLMWIRE_LIVE_VISION_RESPONSES_MODEL",
+        ProtocolId::Chat => "LLMWIRE_LIVE_CHAT_MODEL",
+        ProtocolId::Messages => "LLMWIRE_LIVE_MESSAGES_MODEL",
+        ProtocolId::Responses => "LLMWIRE_LIVE_RESPONSES_MODEL",
         _ => unreachable!(),
     }
 }

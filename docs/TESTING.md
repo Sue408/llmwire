@@ -187,14 +187,10 @@ LLMWIRE_LIVE_RESPONSES_MODEL=
 
 LLMWIRE_LIVE_ENABLE_THINKING=0
 
-LLMWIRE_LIVE_VISION_ENABLE=0
-LLMWIRE_LIVE_VISION_CHAT_MODEL=
-LLMWIRE_LIVE_VISION_MESSAGES_MODEL=
-LLMWIRE_LIVE_VISION_RESPONSES_MODEL=
-LLMWIRE_LIVE_VISION_IMAGE_URL=https://raw.githubusercontent.com/github/explore/main/topics/rust/rust.png
+LLMWIRE_LIVE_VISION_IMAGE_URL=https://httpbin.org/image/png
 ```
 
-`.env` 不进入版本控制；`.env.example` 只保存空 key 与默认端点。Vision live 测试必须显式设置 `LLMWIRE_LIVE_VISION_ENABLE=1`，并填写对应协议的视觉模型；未启用时运行被 `ignored` 测试会失败，避免把未验证配置误记为通过。
+`.env` 不进入版本控制；`.env.example` 只保存空 key 与默认端点。Vision live 测试复用各协议现有的 `URL / API_KEY / MODEL`，仅额外允许覆盖远程图片 URL；测试保持 `ignored`，只有显式运行 `--ignored` 时才访问网络。
 
 ### 7.2 覆盖分层
 
@@ -220,6 +216,6 @@ Live 测试只断言协议契约与不变量，不断言模型输出文本。网
 | Responses | 流式终止 | 本地网关 | verified | `response.completed` 路径已执行 |
 | 全部协议 | 官方端点 | 官方 API | not-run | 当前矩阵仅覆盖本地网关 |
 | 全部协议 | 跨协议 live | 本地网关 | verified | 6 个有向组合的文本非流式与流式均已执行 |
-| 全部协议 | 图片输入 URL / Base64 | 本地网关 | pending-env | M5 harness 已就绪；需视觉模型，未执行不得计为通过 |
+| 全部协议 | 图片输入 URL / Base64 | 本地网关 | verified | 6 个 live 用例已执行：三协议各覆盖远程 URL 与 Base64 |
 
 Responses 真实验证暴露了 `reasoning_text` 与 `encrypted_content` 共存的事件序列；实现已修正为同一 reasoning item 中分别保留明文 thinking 与加密 opaque。

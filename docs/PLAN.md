@@ -15,7 +15,7 @@
 | **M2** | `framing` + 流式 FSM + `Converter` 门面（流式双向） | M2-5 完成 |
 | **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | M3-3 完成 |
 | **M4** | `StaticHost` + `Report` 全链路 + 契约测试 | M4-4 完成 |
-| **M5** | 三协议图片输入：URL / Base64 表示转换 | 文档完成，待实现 |
+| **M5** | 三协议图片输入：URL / Base64 表示转换 | M5-4 完成 |
 
 ## 刻意推迟
 
