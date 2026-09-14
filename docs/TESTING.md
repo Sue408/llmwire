@@ -15,7 +15,7 @@
 
 **测试不是附属，是设计的验证器。**（对应 `decisions/0002`、`decisions/0003`。）
 
-## 2. 四类测试
+## 2. 五类测试
 
 ### 2.1 Property-based 往返（核心）
 
@@ -55,11 +55,22 @@ proptest! {
 
 工具：普通 `#[test]`。以各 `spec/*.md §7` 清单为准，是"协议文档的自动证据"。报告 `reference/LLM接口协议格式深度研究报告.md` 附录 A 的清单为总纲。
 
+### 2.5 Fuzz / robustness
+
+当前不引入 `cargo-fuzz` 或新运行时依赖，用 `proptest` 构造可复现的字节级鲁棒性测试：
+
+- 任意字节、畸形 UTF-8、任意 chunk 序列不 panic。
+- 合法 SSE frame 经过任意切分后，framing 结果与原始 frame 序列一致。
+- 9 个协议方向的文本与工具调用非流式转换等价。
+- 上游流式响应在任意 SSE chunk 切分下，下游输出与终止语义保持一致。
+
+这类测试是常规 fuzz 的快速门禁版本，进入默认 `cargo test`；未来若增加 `cargo-fuzz` target，不得改变核心 crate 的依赖红线。
 ## 3. 目录约定
 
 ```text
 tests/
 ├── boundaries.rs
+├── robustness.rs
 ├── protocol_matrix.rs
 ├── roundtrip_chat.rs
 ├── roundtrip_messages.rs
@@ -101,7 +112,24 @@ cargo test -p llmwire --test boundaries      # P0 边界
 cargo test -p llmwire --test protocol_matrix  # 3x3 矩阵
 cargo test -p llmwire --test live_cross_protocol -- --ignored
 cargo test -p llmwire --test golden_tool_id
+cargo test -p llmwire --test robustness   # P2 抗压与属性测试
+pwsh -NoProfile -File scripts/check-core-deps.ps1
+pwsh -NoProfile -File scripts/check-live-gate.ps1
 ```
+
+### 5.1 CI 门禁
+
+.github/workflows/ci.yml 在 push / pull request 上执行：
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked -p llmwire
+pwsh -NoProfile -File scripts/check-core-deps.ps1
+pwsh -NoProfile -File scripts/check-live-gate.ps1
+```
+
+依赖门禁要求核心直接依赖严格等于 bitflags / serde / serde_json / thiserror，并拒绝 tokio / reqwest / async-trait / anyhow。Live 门禁要求 tests/live_*.rs 中的所有 live_* 测试均标记为 ignored，且 .env 未被 Git 跟踪。
 
 ## 6. 反模式（禁止）
 

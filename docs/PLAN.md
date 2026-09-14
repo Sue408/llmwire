@@ -168,6 +168,39 @@ Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端
 
 ---
 
+## 验证增强
+
+| 阶段 | 目标 | 状态 |
+|---|---|---|
+| **P0** | 验证口径与边界补洞 | 完成 |
+| **P1** | 离线 / Live 跨协议矩阵 | 完成 |
+| **P2** | 抗压、属性测试与 CI 门禁 | 分支验证完成 |
+
+### P2-1 fuzz / robustness
+
+- 文档锚点: `TESTING.md §2.5`
+- 要动: `tests/robustness.rs`
+- 不变量: INV-3、STR-4
+- AC: 任意字节与畸形流不 panic；合法 SSE 在任意 chunk 切分下结果稳定
+- 验证: `cargo test -p llmwire --test robustness`
+
+### P2-2 属性测试扩展
+
+- 文档锚点: `TESTING.md §2.1、§2.5`
+- 要动: `tests/robustness.rs`
+- 不变量: INV-1、INV-2、INV-3
+- AC: 9 个协议方向的文本与工具非流式等价；流式输出不随任意 chunk 切分变化
+- 验证: `cargo test -p llmwire --test robustness`
+
+### P2-3 CI 门禁
+
+- 文档锚点: `TESTING.md §5.1`
+- 要动: `.github/workflows/ci.yml`, `scripts/check-core-deps.ps1`, `scripts/check-live-gate.ps1`
+- 不变量: INV-5
+- AC: CI 顺序执行 fmt、clippy、默认测试、核心依赖检查、live opt-in 检查；`.env` 不入库
+- 验证: `cargo fmt --all -- --check`、`cargo clippy --all-targets -- -D warnings`、`cargo test -p llmwire`、两个 PowerShell 门禁脚本
+
+---
 ## 完成定义（DoD）
 
 一个任务完成，必须同时满足：
