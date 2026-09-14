@@ -15,7 +15,7 @@
 - 一个**字节级转换固件**：`&[u8]` 进，`&mut Vec<u8>` 出。
 - 一个**请求级有界对象**：构造于请求到达，销毁于响应发完，绝不跨请求存活。
 - 一个**诚实的转换器**：任何降级、丢弃、不可表达，都通过 `Report` 显式上报。
-- 覆盖 **OpenAI Chat Completions / Anthropic Messages / OpenAI Responses** 三协议互转（Gemini 推迟）。
+- 覆盖 **OpenAI Chat Completions / Anthropic Messages / OpenAI Responses** 三协议互转；M5 计划补图片输入（Gemini、图片输出推迟）。
 
 **不是什么**
 
@@ -44,7 +44,9 @@
 
 **非目标（刻意推迟）**
 
-Gemini、`ResponseStore`（`store` / `previous_response_id` 服务端存储）、服务端内置工具、MCP 拍平、多模态输入输出、请求侧流式。这些在 IR 稳定后按"加一套 codec"的方式增量引入，不返工。
+Gemini、`ResponseStore`（`store` / `previous_response_id` 服务端存储）、服务端内置工具、MCP 拍平、图片输出、音频/视频/文件管理、URL 下载与 Base64 上传托管、请求侧流式。图片输入按 M5 增量引入，不改变字节接缝。
+
+**M5 图片输入边界**：核心只规范化 `RemoteUrl` / `Base64` 与协议包装，不下载远程图片、不上传 Base64、不托管 URL。需要跨资源模式的解析由 host 在调用 `Converter` 前完成；详见 `spec/IMAGE.md` 与 `decisions/0006-image-input-no-transport.md`。
 
 ## 2. 不可协商约束
 
@@ -245,6 +247,7 @@ c.take_report()
 | `Report` 升为一等 API，诚实上报 | `decisions/0003-report-first-class.md` |
 | `Converter: Send` 而非 `Sync` | `decisions/0004-send-not-sync.md` |
 | 独立 IR，不以 OpenAI 形状为长期语义 | `decisions/0005-independent-ir.md` |
+| 图片输入只做表示转换，不下载/上传 | `decisions/0006-image-input-no-transport.md` |
 
 ## 8. 注意事项与陷阱
 
@@ -284,6 +287,7 @@ insta        = "1"
 3. codex 是否使用 `previous_response_id`：决定 Responses 无状态模式是否够用。
 4. 跨协议后 prefix cache 能否命中：本 SDK 一律透传断点、不重算，但不保证跨协议命中。
 5. 第三方 Anthropic 兼容端点（DeepSeek / Kimi / GLM / vLLM）的 `/v1/messages` 支持度差异。
+6. 图片输入的双支持程度可能随模型、端点和 API 版本变化；M5 用 capabilities 控制，不把 schema 支持等同于模型实际支持。
 
 ## 11. 文档地图
 

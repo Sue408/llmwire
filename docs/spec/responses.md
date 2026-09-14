@@ -11,7 +11,7 @@
 
 - 对话载体：`input`（字符串或 **item 数组**）。
 - 系统提示：顶层 `instructions`。
-- 内容 part：用户侧 `input_text`，历史 assistant 侧 `output_text`，图片 `input_image`。
+- 内容 part：用户侧 `input_text`，历史 assistant 侧 `output_text`，图片 `input_image`。图片 `image_url` 可为远程 URL 或 Base64 data URI。
 - 工具调用：`output[]` 中的 `function_call` item；**`arguments` 是完整 JSON 字符串**。
 - 工具结果：`function_call_output` item。
 - 停止语义：`status`（`completed/incomplete/failed/cancelled`）+ `incomplete_details`。
@@ -27,7 +27,7 @@
 | `input`（string） | `Turn{User}` + `Part::Text` | |
 | `input[].type:"message"` | `Turn{role}` | `role ∈ user/assistant/system/developer`；后两者提升进 system |
 | `input[].content[].type:"input_text"` | `Part::Text` | |
-| `input[].content[].type:"input_image"` | `Part::Image` | |
+| `input[].content[].type:"input_image"` | `Part::Image` | `image_url` 为 URL 或 data URI，按 `IMAGE.md §3` 规范化 |
 | `input[].type:"function_call"` | `Part::ToolUse` | `call_id`→`ToolId`；`arguments` 完整字符串进 `RawJson` |
 | `input[].type:"function_call_output"` | `Part::ToolResult` | `call_id` 关联 |
 | `input[].type:"reasoning"` | `Part::Opaque` / `Thinking` | `encrypted_content` → `Opaque{ResponsesEncryptedReasoning}`，**原样回传** |
@@ -48,6 +48,8 @@
 | `Part::Text`（assistant） | `type:"output_text"` | 命名与 Chat 不同 |
 | `Part::ToolUse` | `function_call` item | `arguments` 用 `raw()` |
 | `Part::ToolResult` | `function_call_output` item | |
+| `Part::Image(RemoteUrl)` | `input_image.image_url = url` | URL byte-equal 透传 |
+| `Part::Image(Base64)` | `input_image.image_url = data:<media_type>;base64,<data>` | 不访问网络 |
 | `Part::Opaque` | 对应 item | 字节保真 |
 | `ToolDef` | 扁平 function tool | `parameters` 用 `raw()` |
 
@@ -115,6 +117,8 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 - **RESP-TRAP-6**：`instructions` 与 `previous_response_id` **不跨轮继承**；无状态模式须显式拒绝对应字段。
 - **RESP-TRAP-7**：`include` 请求的字段（如 `web_search_call.action.sources`）可缺省，不得臆造。
 - **RESP-TRAP-8**：`max_output_tokens` 最小值 16；越界应校验并报错，不静默裁剪。
+- **RESP-TRAP-9**：`input_image.image_url` 是多态字段，可放远程 URL 或 `data:` Base64 URI；不得把字段名当远程资源保证。
+- **RESP-TRAP-10**：`file_id` / 文件引用不是 inline Base64；M5 不支持时明确 `Unsupported` / `Report`（`IMAGE.md`）。
 
 ## 7. 契约测试清单（本协议）
 
@@ -128,3 +132,6 @@ Responses SSE 是**语义事件**（30+ 种），每帧 `event:` + `data:` 双�
 - [x] `previous_response_id` 返回 `Unsupported`
 - [x] 内置工具 item 透传 / 上报
 - [x] `output_text` 便捷字段与 `output[]` 一致性
+- [ ] 远程 URL 非流式往返 byte-equal
+- [ ] Base64 / data URI 非流式往返 byte-equal
+- [ ] `file_id` 明确 `Unsupported`

@@ -24,10 +24,11 @@
 | `DESIGN.md` | 冻结-稳定 | 架构/实现 | 正式项目设计：定位、架构、API、不变量、陷阱 |
 | `spec/IR.md` | 半稳定 | codec 实现者 | IR 规范：类型、canonical form、IR 级不变量 |
 | `spec/STREAMING.md` | 半稳定 | 流式实现者 | 内部事件集、FSM、`feed`/`finish`、终止语义 |
+| `spec/IMAGE.md` | 半稳定 | M5 图片实现者 | 图片输入：RemoteUrl / Base64 / data URI、转换矩阵、无传输边界 |
 | `spec/chat.md` | 半稳定 | chat codec | OpenAI Chat ↔ IR 双向映射 + 陷阱 + 用例 |
 | `spec/messages.md` | 半稳定 | messages codec | Anthropic Messages ↔ IR 双向映射 + 陷阱 + 用例 |
 | `spec/responses.md` | 半稳定 | responses codec | OpenAI Responses ↔ IR 双向映射 + 陷阱 + 用例 |
-| `PLAN.md` | 活跃 | 接任务者 | M0–M4 里程碑与任务块、验收标准 |
+| `PLAN.md` | 活跃 | 接任务者 | M0–M5 里程碑与任务块、验收标准 |
 | `TESTING.md` | 半稳定 | 写测试者 | 测试策略 + 契约清单索引 |
 | `decisions/000*.md` | 冻结 | 想推翻决策者 | ADR：为什么这么定 |
 | `reference/*` | 冻结 | 查证者 | 协议深度研究报告、同类项目分析报告 |
@@ -37,6 +38,7 @@
 
 - **总体把握**：`../AGENTS.md` → `DESIGN.md` → `PLAN.md`
 - **实现任一 codec**：`spec/IR.md` → `spec/STREAMING.md` → `spec/<protocol>.md`
+- **实现图片输入**：`spec/IR.md §3` → `spec/IMAGE.md` → 对应协议 spec
 - **改流式**：`spec/STREAMING.md` → `DESIGN.md §6、§8`
 - **接任务**：`PLAN.md` → 该任务"文档锚点"列出的章节
 - **想推翻某设计**：`decisions/<对应 ADR>.md`
@@ -69,6 +71,7 @@ llmwire/
     ├── TESTING.md                # 测试策略
     ├── spec/
     │   ├── IR.md
+    │   ├── IMAGE.md
     │   ├── STREAMING.md
     │   ├── chat.md
     │   ├── messages.md
@@ -78,7 +81,8 @@ llmwire/
     │   ├── 0002-request-level-object.md
     │   ├── 0003-report-first-class.md
     │   ├── 0004-send-not-sync.md
-    │   └── 0005-independent-ir.md
+    │   ├── 0005-independent-ir.md
+    │   └── 0006-image-input-no-transport.md
     ├── reference/
     │   ├── LLM接口协议格式深度研究报告.md
     │   └── LLM协议转换分析报告.md
@@ -98,6 +102,7 @@ llmwire/
 | 2026-09-14 | `response.incomplete` 引用不存在的 `StopReason::MultipleCandidates` | `spec/IR.md §7`、`spec/responses.md §5` | 按 `incomplete_details.reason` 映射 `MaxTokens` / `ContentFilter` / `Other` 并上报；已处理 |
 | 2026-09-14 | Chat 空 `delta.content` 与“首个非空”冲突 | `spec/chat.md CHAT-TRAP-5` | 明确空字符串也算 `delta.content` 首次出现；已处理 |
 | 2026-09-14 | `ImageRef` 被引用但未定义 | `spec/IR.md §3` 核心类型完整性 | 补充 `Url` / `Base64` 两态；已处理 |
+| 2026-09-14 | `ImageRef::Url` 无法区分远程 URL 和 data URI，容易误解为可任意互转 | `spec/IMAGE.md`、`decisions/0006` | M5 改为 `RemoteUrl` / `Base64`，核心不下载/上传；已设计 |
 | 2026-09-14 | `Opaque` 派生 `Debug` 会暴露 bytes，违背 INV-4 | `DESIGN.md` INV-4 优先 | 改为手写 `Debug`，仅输出 `kind + len`；已处理 |
 | 2026-09-14 | IR-INV-USAGE-2 正向公式漏减 cache_creation，与反向公式和包含关系注释冲突 | IR.md §8 的可逆 round-trip 要求 | 正向改为同时减去 cached / cache_creation；已处理 |
 | 2026-09-14 | 流式 `PartStart` 缺少 tool id/name/kind，Messages/Chat 工具调用跨协议时无法无损转换 | `spec/STREAMING.md` 事件集需满足 INV-3、IR-INV-TOOL-1 | 在 `PartStart` 增加可选 `ToolStart` 元数据；已处理 |

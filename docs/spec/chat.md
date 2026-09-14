@@ -12,6 +12,7 @@
 - 系统提示：`role:"system"` / `role:"developer"` 的消息（非顶层字段）。
 - 内容单元：`content` 为字符串或 content-part 数组。
 - 工具调用：`message.tool_calls[]`，参数是 **JSON 字符串**。
+- 图片输入：content part `image_url`，其 `url` 可为远程 URL 或 Base64 data URI。
 - 工具结果：`role:"tool"` 消息，带 `tool_call_id`。
 - 停止语义：`choices[].finish_reason`。
 - usage：`usage.{prompt,completion,total}_tokens` + `*_tokens_details`。
@@ -28,7 +29,7 @@
 | `messages[*].role:"tool"` | `Turn{User}` 内 `Part::ToolResult` | 连续 tool + 后续 user 合并进同一 User turn（CF-1） |
 | `tool_call_id` | `ToolResult.tool_use_id` | 字节保真 |
 | `content` 单字符串 | `Part::Text` / `ToolResultContent::Text` | |
-| `content` part 数组 | 逐 part 映射 | `text`→`Text`；`image_url`→`Image` |
+| `content` part 数组 | 逐 part 映射 | `text`→`Text`；`image_url`→`ImageRef`；URL / data URI 按 `IMAGE.md §3` 规范化 |
 | `tools[].function` | `ToolDef` | `parameters` 进 `RawJson`（字节权威） |
 | `tool_choice` | `ToolChoice` | `auto/required/none` → `Auto/Required/None`；`{type:"function",function:{name}}` → `Named(name)` |
 | `max_completion_tokens` | `Sampling.max_output_tokens` | 优先 |
@@ -49,6 +50,8 @@
 | `ToolDef` | `tools[].function` | `parameters` 用 `raw()` |
 | `Sampling.max_output_tokens` | `max_completion_tokens` | 新模型；旧模型可降级为 `max_tokens` 并记 `Report` |
 | `Sampling.stop` | `stop`（单值） | 多值无法表达时**上报**，不得静默取第一个 |
+| `Part::Image(RemoteUrl)` | `image_url.url = url` | URL byte-equal 透传，不下载 |
+| `Part::Image(Base64)` | `image_url.url = data:<media_type>;base64,<data>` | 纯编码，不访问网络 |
 | `ToolUseKind::Server` / `Remote` | 无对应 | 上报 `Report`（`NotRepresentable`） |
 | `Part::Thinking` / `Opaque` | 无对应 | 按 `ThinkingPolicy` 处理（见 `../DESIGN.md §4`） |
 
@@ -111,6 +114,8 @@ Chat 流：单 `data:` JSON chunk，末 `data: [DONE]`。
 - **CHAT-TRAP-4**：`n>1` 时 `choices` 多个，必须进 `AssistantOutput.choices`。
 - **CHAT-TRAP-5**：空字符串 `delta.content` 是合法增量，不得用 `if delta` 过滤。
 - **CHAT-TRAP-6**：`[DONE]` 不是 JSON，须先字符串比较再 JSON 解析。
+- **CHAT-TRAP-7**：`image_url.url` 是多态字段，既可能是远程 URL，也可能是 `data:` Base64 URI；不得按字段名假定为远程资源。
+- **CHAT-TRAP-8**：图片不支持下载/上传；URL 透传，Base64 构造 data URI。跨模式需求由 host 在 core 外解决（`IMAGE.md`）。
 
 ## 7. 契约测试清单（本协议）
 
@@ -124,3 +129,6 @@ Chat 流：单 `data:` JSON chunk，末 `data: [DONE]`。
 - [x] 注释行 `: keep-alive` 容忍
 - [x] `finish_reason` 私有值
 - [x] 未知字段进 `Report`（INV-3）
+- [ ] 远程 URL 非流式往返 byte-equal
+- [ ] Base64 / data URI 非流式往返 byte-equal
+- [ ] 非法 data URI 与 `file_id` 明确 `Unsupported`

@@ -11,6 +11,7 @@
 - 对话载体：`messages[]`，`role` **仅 user / assistant**。
 - 系统提示：**顶层 `system` 字段**（string 或带 `cache_control` 的 text block 数组）。
 - 内容单元：**content block 数组**（`text` / `image` / `tool_use` / `tool_result` / `thinking` / `redacted_thinking`）。
+- 图片输入：`image.source` 明确二选一：远程 `url` 或 inline `base64`。
 - 工具调用：`content[]` 内 `tool_use` block，参数是**对象**（`input`）。
 - 工具结果：user message 内 `tool_result` block。
 - 停止语义：`stop_reason`。
@@ -26,7 +27,7 @@
 | `messages[*].role:"user"` | `Turn{User}` | |
 | `messages[*].role:"assistant"` | `Turn{Assistant}` | |
 | `content[].type:"text"` | `Part::Text` | |
-| `content[].type:"image"` | `Part::Image` | `source.base64` → `ImageRef` |
+| `content[].type:"image"` | `Part::Image` | `source.type:"base64"` → `Base64`；`source.type:"url"` → `RemoteUrl` |
 | `content[].type:"tool_use"` | `Part::ToolUse` | `input`（对象）进 `RawJson`；`id`→`ToolId`（`toolu_` 前缀原样） |
 | `content[].type:"tool_result"` | `Part::ToolResult` | `content` 可为 string 或 block 数组 → `ToolResultContent` |
 | `content[].type:"thinking"` | `Part::Thinking` | `signature` 进 `Opaque{AnthropicThinkingSignature}` |
@@ -49,6 +50,8 @@
 | `ToolDef` | `tools[]`，schema 放 `input_schema` | `parameters` 用 `raw()` |
 | `Sampling.max_output_tokens` | `max_tokens` | 若为 `None`，须由 host 能力表补默认；**不得缺失** |
 | `Reasoning.effort` | `thinking.budget_tokens` | 无一一对应时按能力降级并 `Report` |
+| `Part::Image(RemoteUrl)` | `source:{type:"url",url}` | URL byte-equal 透传 |
+| `Part::Image(Base64)` | `source:{type:"base64",media_type,data}` | 不搬 payload 到 data URI 前缀内 |
 | `ToolUseKind::Server/Remote` | 原生 tool 语义 | 需保留 id 前缀，不得误判为普通 `tool_use`（见 §6） |
 
 ## 3. 响应映射
@@ -109,6 +112,8 @@ Messages SSE 事件序列：`message_start → content_block_start → content_b
 - **MSG-TRAP-6**：`input_json_delta.partial_json` 拼接后才可解析，禁止逐 chunk `parse`。
 - **MSG-TRAP-7**：`temperature` 区间为 0–1，与 OpenAI 的 0–2 不同；跨协议转换按目标区间**裁剪并上报**，不做静默映射。
 - **MSG-TRAP-8**：本协议无 `n`；IR 侧 `n>1` 需在上游能力不支持时上报。
+- **MSG-TRAP-9**：`source.type` 是显式判别式；`base64` 的 `data` 必须是纯 payload，不能带 `data:` URI 前缀。
+- **MSG-TRAP-10**：图片 URL 不下载、Base64 不上传；无法跨模式时由 host 处理，core 只报 `Unsupported` / `Report`（`IMAGE.md`）。
 
 ## 7. 契约测试清单（本协议）
 
@@ -123,3 +128,6 @@ Messages SSE 事件序列：`message_start → content_block_start → content_b
 - [x] `ping` 容忍
 - [x] `max_tokens` 缺失补默认
 - [x] 服务端工具 `srvtoolu_` 判定
+- [ ] `source.type:"url"` 非流式往返 byte-equal
+- [ ] `source.type:"base64"` payload / media type 往返一致
+- [ ] `file_id` 明确 `Unsupported`
