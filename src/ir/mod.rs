@@ -9,7 +9,7 @@ mod usage;
 pub use crate::ids::OpaqueKind;
 pub use event::{Delta, Event, PartKind, Termination, ToolStart, UsagePatch};
 pub use output::{AssistantOutput, Choice, Finish, StopReason};
-pub use part::{ImageRef, Opaque, Part, Thinking};
+pub use part::{ImageRef, ImageSource, Opaque, Part, Thinking};
 pub use sampling::{Reasoning, ReasoningEffort, Sampling};
 pub use state::StreamState;
 pub use tool::{
