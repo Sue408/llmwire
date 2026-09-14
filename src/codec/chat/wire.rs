@@ -49,6 +49,7 @@ pub(crate) enum ContentPartIn {
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImageUrlIn {
     pub url: String,
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -180,6 +181,8 @@ pub(crate) enum ContentPartOut {
 #[derive(Debug, Serialize)]
 pub(crate) struct ImageUrlOut {
     pub url: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

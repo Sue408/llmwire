@@ -89,13 +89,14 @@ pub(crate) struct RefusalPartIn {
 #[derive(Debug, Deserialize)]
 pub(crate) struct ImagePartIn {
     pub image_url: ImageUrlIn,
+    pub detail: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub(crate) enum ImageUrlIn {
     Url(String),
-    Object { url: String },
+    Object { url: String, detail: Option<String> },
 }
 
 #[derive(Debug, Deserialize)]

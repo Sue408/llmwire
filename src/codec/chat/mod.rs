@@ -304,7 +304,7 @@ fn decode_content_parts(parts: Vec<ContentPartIn>) -> Result<Vec<Part>, Error> {
             ContentPartIn::Text { text } => Ok(Part::Text(text)),
             ContentPartIn::ImageUrl { image_url } => Ok(Part::Image(ImageRef {
                 source: decode_openai_image_url(image_url.url)?,
-                detail: None,
+                detail: image_url.detail.map(String::into_boxed_str),
             })),
         })
         .collect()
@@ -496,6 +496,7 @@ fn encode_user_turn(turn: &Turn, messages: &mut Vec<MessageOut>) -> Result<(), E
             Part::Image(image) => pending.push(ContentPartOut::ImageUrl {
                 image_url: ImageUrlOut {
                     url: encode_openai_image_url(&image.source),
+                    detail: image.detail.as_deref().map(str::to_owned),
                 },
             }),
             _ => return Err(unsupported("chat user part")),
@@ -584,6 +585,7 @@ fn encode_content_parts(parts: &[Part]) -> Result<Vec<ContentPartOut>, Error> {
             Part::Image(image) => Ok(ContentPartOut::ImageUrl {
                 image_url: ImageUrlOut {
                     url: encode_openai_image_url(&image.source),
+                    detail: image.detail.as_deref().map(str::to_owned),
                 },
             }),
             _ => Err(unsupported("chat content part")),
