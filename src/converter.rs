@@ -1,9 +1,14 @@
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 use crate::caps::{Capabilities, Mode, ParamSet, ThinkingPolicy};
 use crate::codec::ProtocolCodec;
 use crate::framing::{encode_frame, SseFrame, SseFramer};
-use crate::ir::{Conversation, Delta, Event, PartKind, StreamState, Termination, ToolChoice};
+use crate::ids::OpaqueKind;
+use crate::ir::{
+    AssistantOutput, Conversation, Delta, Event, Finish, Opaque, Part, PartKind, StopReason,
+    StreamState, Termination, ToolChoice,
+};
 use crate::report::{Report, Severity, UnmappedReason};
 use crate::{Error, ProtocolId};
 
@@ -28,9 +33,11 @@ pub fn converter(
         caps,
         conversation: None,
         state: StreamState::new(),
+        source_state: StreamState::new(),
         framer: SseFramer::new(),
         report: Report::new(),
         streaming: None,
+        skipped_parts: BTreeSet::new(),
         explicit_termination: false,
     }))
 }
@@ -43,10 +50,12 @@ struct ConverterImpl {
     caps: Capabilities,
     conversation: Option<Conversation>,
     state: StreamState,
+    source_state: StreamState,
     framer: SseFramer,
     report: Report,
     streaming: Option<bool>,
     explicit_termination: bool,
+    skipped_parts: BTreeSet<usize>,
 }
 
 impl Converter for ConverterImpl {
@@ -77,6 +86,7 @@ impl Converter for ConverterImpl {
         let output = self
             .target
             .decode_response_with_report(body, &mut self.report)?;
+        let output = self.filter_response_for_source(output);
         let encoded = self
             .source
             .encode_response_with_report(&output, &mut self.report)?;
@@ -146,18 +156,29 @@ impl ConverterImpl {
             self.record_degradations(&decoded.events);
 
             for event in &decoded.events {
+                if event_is_skipped(event, &self.skipped_parts) {
+                    continue;
+                }
+                if !event_supported_by_source(self.src, self.caps.thinking, event) {
+                    if let Event::PartStart { index, .. } = event {
+                        self.skipped_parts.insert(*index);
+                    }
+                    self.report_removed_stream_event(event);
+                    continue;
+                }
+
+                self.source_state.apply(event.clone())?;
                 match self.source.encode_stream_event_with_report(
                     event,
-                    &self.state,
+                    &self.source_state,
                     &mut self.report,
                 ) {
                     Ok(frames) => append_frames(out, frames),
                     Err(Error::Unsupported(_message)) => {
-                        self.report.unmapped(
-                            "stream.target_event",
-                            UnmappedReason::UnsupportedByTarget,
-                            Severity::Degraded,
-                        );
+                        if let Event::PartStart { index, .. } = event {
+                            self.skipped_parts.insert(*index);
+                        }
+                        self.report_removed_stream_event(event);
                     }
                     Err(error) => return Err(error),
                 }
@@ -165,6 +186,41 @@ impl ConverterImpl {
 
             if decoded.termination.is_some() {
                 self.explicit_termination = true;
+                let has_error = decoded
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, Event::Error(_)));
+                if decoded.termination == Some(Termination::Explicit)
+                    && !self.state.is_finished()
+                    && !has_error
+                {
+                    self.report.warn(
+                        "stream.finish",
+                        "upstream terminal did not include finish metadata; synthesized EndTurn",
+                        Severity::Degraded,
+                    );
+                    let finish = Event::Finish(Finish {
+                        canonical: StopReason::EndTurn,
+                        provider_raw: Box::from(""),
+                    });
+                    self.state.apply(finish.clone())?;
+                    self.source_state.apply(finish.clone())?;
+                    match self.source.encode_stream_event_with_report(
+                        &finish,
+                        &self.source_state,
+                        &mut self.report,
+                    ) {
+                        Ok(frames) => append_frames(out, frames),
+                        Err(Error::Unsupported(_message)) => {
+                            self.report.unmapped(
+                                "stream.finish",
+                                UnmappedReason::UnsupportedByTarget,
+                                Severity::Degraded,
+                            );
+                        }
+                        Err(error) => return Err(error),
+                    }
+                }
             }
         }
 
@@ -240,6 +296,105 @@ impl ConverterImpl {
 
         Ok(())
     }
+    fn filter_response_for_source(&mut self, mut output: AssistantOutput) -> AssistantOutput {
+        let severity = if self.caps.mode == Mode::Strict {
+            Severity::Fatal
+        } else {
+            Severity::Degraded
+        };
+
+        for (choice_index, choice) in output.choices.iter_mut().enumerate() {
+            let mut parts = Vec::with_capacity(choice.parts.len());
+            for (part_index, part) in choice.parts.drain(..).enumerate() {
+                let stripped_by_policy = (self.src == ProtocolId::Chat
+                    || self.caps.thinking == ThinkingPolicy::Strip)
+                    && matches!(part, Part::Thinking(_) | Part::Opaque(_));
+                if stripped_by_policy || !part_supported_by_source(self.src, &part) {
+                    self.report_removed_response_part(choice_index, part_index, part, severity);
+                } else {
+                    parts.push(part);
+                }
+            }
+            choice.parts = parts;
+        }
+
+        output
+    }
+
+    fn report_removed_response_part(
+        &mut self,
+        choice_index: usize,
+        part_index: usize,
+        part: Part,
+        severity: Severity,
+    ) {
+        let field = format!("response.choices[{choice_index}].parts[{part_index}]");
+        match part {
+            Part::Thinking(thinking) => {
+                self.report.unmapped(
+                    format!("{field}.thinking"),
+                    UnmappedReason::NotRepresentable,
+                    severity,
+                );
+                if let Some(signature) = thinking.signature {
+                    self.report.opaque(
+                        format!("{field}.signature"),
+                        signature.kind,
+                        signature.bytes.len(),
+                        severity,
+                    );
+                }
+            }
+            Part::Opaque(opaque) => {
+                self.report.opaque(
+                    format!("{field}.opaque"),
+                    opaque.kind,
+                    opaque.bytes.len(),
+                    severity,
+                );
+            }
+            _ => self
+                .report
+                .unmapped(field, UnmappedReason::NotRepresentable, severity),
+        }
+    }
+
+    fn report_removed_stream_event(&mut self, event: &Event) {
+        let severity = if self.caps.mode == Mode::Strict {
+            Severity::Fatal
+        } else {
+            Severity::Degraded
+        };
+        match event {
+            Event::PartStart {
+                kind: PartKind::Opaque(kind),
+                index,
+                ..
+            } => self
+                .report
+                .opaque(format!("stream.source_event[{index}]"), *kind, 0, severity),
+            Event::PartDelta {
+                delta: Delta::Opaque(Opaque { kind, bytes }),
+                index,
+            } => self.report.opaque(
+                format!("stream.source_event[{index}]"),
+                *kind,
+                bytes.len(),
+                severity,
+            ),
+            Event::PartStart { kind, index, .. } => self.report.unmapped(
+                format!("stream.source_event[{index}].{kind:?}"),
+                UnmappedReason::UnsupportedByTarget,
+                severity,
+            ),
+            _ => self.report.unmapped(
+                "stream.source_event",
+                UnmappedReason::UnsupportedByTarget,
+                severity,
+            ),
+        }
+    }
+
     fn record_degradations(&mut self, events: &[Event]) {
         let severity = if self.caps.mode == Mode::Strict {
             Severity::Fatal
@@ -289,7 +444,8 @@ impl ConverterImpl {
 
         if self.src == ProtocolId::Messages {
             for (index, event) in events.iter().enumerate() {
-                if matches!(event, Event::MessageStart { .. }) && self.state.usage().input.is_none()
+                if matches!(event, Event::MessageStart { .. })
+                    && self.source_state.usage().input.is_none()
                 {
                     self.report.warn(
                         "stream.message_start.usage.input",
@@ -319,10 +475,11 @@ impl ConverterImpl {
         );
 
         let event = Event::Error(Box::new(error));
-        match self
-            .source
-            .encode_stream_event_with_report(&event, &self.state, &mut self.report)
-        {
+        match self.source.encode_stream_event_with_report(
+            &event,
+            &self.source_state,
+            &mut self.report,
+        ) {
             Ok(frames) => append_frames(out, frames),
             Err(encode_error) => {
                 let frame = SseFrame {
@@ -339,6 +496,109 @@ impl ConverterImpl {
                 out.extend_from_slice(&encode_frame(&frame));
             }
         }
+    }
+}
+
+fn event_is_skipped(event: &Event, skipped_parts: &BTreeSet<usize>) -> bool {
+    match event {
+        Event::PartDelta { index, .. } | Event::PartStop { index } => skipped_parts.contains(index),
+        _ => false,
+    }
+}
+
+fn event_supported_by_source(
+    protocol: ProtocolId,
+    thinking_policy: ThinkingPolicy,
+    event: &Event,
+) -> bool {
+    match event {
+        Event::PartStart { kind, .. } => part_kind_supported_by_source(protocol, *kind),
+        Event::PartDelta { delta, .. } => match delta {
+            Delta::Text(_) | Delta::ToolArguments(_) => true,
+            Delta::Thinking(_) => {
+                protocol != ProtocolId::Chat && thinking_policy != ThinkingPolicy::Strip
+            }
+            Delta::Opaque(opaque) => opaque_supported_by_source(protocol, opaque.kind),
+        },
+        _ => true,
+    }
+}
+
+fn part_kind_supported_by_source(protocol: ProtocolId, kind: PartKind) -> bool {
+    match protocol {
+        ProtocolId::Chat => matches!(kind, PartKind::Text | PartKind::ToolUse),
+        ProtocolId::Messages => matches!(
+            kind,
+            PartKind::Text
+                | PartKind::Thinking
+                | PartKind::ToolUse
+                | PartKind::Opaque(OpaqueKind::AnthropicRedactedThinking)
+                | PartKind::Opaque(OpaqueKind::ProviderSpecific("anthropic_content_block"))
+        ),
+        ProtocolId::Responses => matches!(
+            kind,
+            PartKind::Text
+                | PartKind::Thinking
+                | PartKind::ToolUse
+                | PartKind::Opaque(OpaqueKind::ResponsesEncryptedReasoning)
+                | PartKind::Opaque(OpaqueKind::ProviderSpecific("responses_item"))
+        ),
+    }
+}
+
+fn opaque_supported_by_source(protocol: ProtocolId, kind: OpaqueKind) -> bool {
+    match protocol {
+        ProtocolId::Chat => false,
+        ProtocolId::Messages => matches!(
+            kind,
+            OpaqueKind::AnthropicThinkingSignature
+                | OpaqueKind::AnthropicRedactedThinking
+                | OpaqueKind::ProviderSpecific("anthropic_content_block")
+        ),
+        ProtocolId::Responses => matches!(
+            kind,
+            OpaqueKind::ResponsesEncryptedReasoning
+                | OpaqueKind::ProviderSpecific("responses_item")
+        ),
+    }
+}
+
+fn part_supported_by_source(protocol: ProtocolId, part: &Part) -> bool {
+    match protocol {
+        ProtocolId::Chat => matches!(part, Part::Text(_) | Part::ToolUse(_)),
+        ProtocolId::Messages => matches!(
+            part,
+            Part::Text(_)
+                | Part::Image(_)
+                | Part::ToolUse(_)
+                | Part::ToolResult(_)
+                | Part::Thinking(_)
+                | Part::Opaque(Opaque {
+                    kind: OpaqueKind::AnthropicRedactedThinking,
+                    ..
+                })
+                | Part::Opaque(Opaque {
+                    kind: OpaqueKind::ProviderSpecific("anthropic_content_block"),
+                    ..
+                })
+        ),
+        ProtocolId::Responses => matches!(
+            part,
+            Part::Text(_)
+                | Part::ToolUse(_)
+                | Part::Thinking(crate::ir::Thinking {
+                    signature: None,
+                    ..
+                })
+                | Part::Opaque(Opaque {
+                    kind: OpaqueKind::ResponsesEncryptedReasoning,
+                    ..
+                })
+                | Part::Opaque(Opaque {
+                    kind: OpaqueKind::ProviderSpecific("responses_item"),
+                    ..
+                })
+        ),
     }
 }
 
