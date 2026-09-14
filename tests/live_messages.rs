@@ -62,9 +62,11 @@ fn live_messages_cache_control_and_usage_roundtrip() {
 #[ignore = "requires .env live API settings and LLMWIRE_LIVE_ENABLE_THINKING=1"]
 fn live_messages_thinking_signature_roundtrip() {
     let env = load_env().expect(".env is required for live API tests");
-    if optional(&env, "LLMWIRE_LIVE_ENABLE_THINKING").as_deref() != Some("1") {
-        return;
-    }
+    assert_eq!(
+        optional(&env, "LLMWIRE_LIVE_ENABLE_THINKING").as_deref(),
+        Some("1"),
+        "set LLMWIRE_LIVE_ENABLE_THINKING=1 before running the live thinking test"
+    );
     let url = required(&env, "LLMWIRE_LIVE_MESSAGES_URL");
     let key = required(&env, "LLMWIRE_LIVE_MESSAGES_API_KEY");
     let model = required(&env, "LLMWIRE_LIVE_MESSAGES_MODEL");

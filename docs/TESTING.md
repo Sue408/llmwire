@@ -47,13 +47,9 @@ proptest! {
 - `Opaque.bytes` / `RawJson.raw()` round-trip 后 byte-equal。
 - 序列化 key 顺序稳定（prefix cache 相关，`DESIGN.md` TRAP-2）。
 
-### 2.3 事件序列快照
+### 2.3 事件序列断言
 
-工具：`insta`。对每个协议的流式事件序列做快照，覆盖：纯文本、thinking、单工具、并行工具、流中错误、中途断连、畸形输入容忍清单（`spec/STREAMING.md §6`）。
-
-```powershell
-cargo insta review
-```
+当前使用普通 `#[test]` 对关键事件序列做精确断言，尚未启用 `insta` 快照，因此快照不作为现有验证证据。后续接入快照时，必须覆盖纯文本、thinking、单工具、并行工具、流中错误、中途断连与畸形输入容忍清单（`spec/STREAMING.md §6`）。
 
 ### 2.4 契约测试
 
@@ -63,6 +59,7 @@ cargo insta review
 
 ```text
 tests/
+├── boundaries.rs
 ├── roundtrip_chat.rs
 ├── roundtrip_messages.rs
 ├── roundtrip_responses.rs
@@ -98,8 +95,8 @@ tests/
 ```powershell
 cargo test -p llmwire                          # 全部
 cargo test -p llmwire --test roundtrip_chat    # 单个往返
+cargo test -p llmwire --test boundaries      # P0 边界
 cargo test -p llmwire --test golden_tool_id
-cargo insta review                              # 快照审阅
 ```
 
 ## 6. 反模式（禁止）
@@ -134,10 +131,15 @@ LLMWIRE_LIVE_CHAT_MODEL=
 LLMWIRE_LIVE_MESSAGES_URL=https://api.anthropic.com/v1/messages
 LLMWIRE_LIVE_MESSAGES_API_KEY=
 LLMWIRE_LIVE_MESSAGES_MODEL=
+LLMWIRE_LIVE_MESSAGES_VERSION=2023-06-01
+LLMWIRE_LIVE_MESSAGES_BETA=
+
 
 LLMWIRE_LIVE_RESPONSES_URL=https://api.openai.com/v1/responses
 LLMWIRE_LIVE_RESPONSES_API_KEY=
 LLMWIRE_LIVE_RESPONSES_MODEL=
+
+LLMWIRE_LIVE_ENABLE_THINKING=0
 ```
 
 `.env` 不进入版本控制；`.env.example` 只保存空 key 与默认端点。
@@ -154,10 +156,17 @@ Live 测试只断言协议契约与不变量，不断言模型输出文本。网
 
 ### 7.3 当前验证矩阵
 
-| 协议 | 端点 | 模型 | 验证结果 |
-|---|---|---|---|
-| Chat | 本地网关 | `deepseek-flash-offical` | 非流式、流式显式终止通过 |
-| Messages | 本地网关 | `claude-haiku-4-5` | 非流式、cache_control、usage、thinking/signature 通过 |
-| Responses | 本地网关 | `gpt-4.6-luna` | 非流式、function_call id、流式 `response.completed` 通过 |
+| 协议 | 能力 | 端点 | 状态 | 说明 |
+|---|---|---|---|---|
+| Chat | 非流式 | 本地网关 | verified | 请求/响应可解码 |
+| Chat | 流式显式终止 | 本地网关 | verified | `data: [DONE]` 路径已执行 |
+| Messages | 非流式 | 本地网关 | verified | 请求/响应可解码 |
+| Messages | cache_control + usage | 本地网关 | verified | 真实请求已执行 |
+| Messages | thinking/signature | 本地网关 | skipped | 当前 `LLMWIRE_LIVE_ENABLE_THINKING=0`，不得计为通过 |
+| Responses | 非流式 | 本地网关 | verified | 请求/响应可解码 |
+| Responses | function_call id | 本地网关 | verified | `call_id` 与 arguments 已校验 |
+| Responses | 流式终止 | 本地网关 | verified | `response.completed` 路径已执行 |
+| 全部协议 | 官方端点 | 官方 API | not-run | 当前矩阵仅覆盖本地网关 |
+| 全部协议 | 跨协议 live | 本地网关 | not-run | 当前 live 测试均为同协议 smoke |
 
 Responses 真实验证暴露了 `reasoning_text` 与 `encrypted_content` 共存的事件序列；实现已修正为同一 reasoning item 中分别保留明文 thinking 与加密 opaque。

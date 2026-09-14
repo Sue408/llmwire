@@ -60,7 +60,7 @@ impl ProtocolCodec for Chat {
             );
         }
 
-        let (system, turns) = decode_messages(messages)?;
+        let (system, turns) = decode_messages(messages, report)?;
         Ok(Conversation {
             system,
             turns,
@@ -215,12 +215,15 @@ impl ProtocolCodec for Chat {
         stream::encode_stream_event(event, state)
     }
 }
-fn decode_messages(messages: Vec<MessageIn>) -> Result<(Vec<Part>, Vec<Turn>), Error> {
+fn decode_messages(
+    messages: Vec<MessageIn>,
+    report: &mut Report,
+) -> Result<(Vec<Part>, Vec<Turn>), Error> {
     let mut system = Vec::new();
     let mut turns = Vec::new();
-    let mut messages = messages.into_iter().peekable();
+    let mut messages = messages.into_iter().enumerate().peekable();
 
-    while let Some(message) = messages.next() {
+    while let Some((message_index, message)) = messages.next() {
         match message.role.as_str() {
             "user" => turns.push(Turn {
                 role: Role::User,
@@ -232,12 +235,18 @@ fn decode_messages(messages: Vec<MessageIn>) -> Result<(Vec<Part>, Vec<Turn>), E
             }),
             "tool" => {
                 let mut parts = vec![Part::ToolResult(decode_tool_result(message)?)];
-                while matches!(messages.peek().map(|item| item.role.as_str()), Some("tool")) {
-                    let message = messages.next().expect("peeked message");
+                while matches!(
+                    messages.peek().map(|(_, item)| item.role.as_str()),
+                    Some("tool")
+                ) {
+                    let (_, message) = messages.next().expect("peeked message");
                     parts.push(Part::ToolResult(decode_tool_result(message)?));
                 }
-                if matches!(messages.peek().map(|item| item.role.as_str()), Some("user")) {
-                    let message = messages.next().expect("peeked message");
+                if matches!(
+                    messages.peek().map(|(_, item)| item.role.as_str()),
+                    Some("user")
+                ) {
+                    let (_, message) = messages.next().expect("peeked message");
                     parts.extend(decode_message_parts(message)?);
                 }
                 turns.push(Turn {
@@ -249,6 +258,13 @@ fn decode_messages(messages: Vec<MessageIn>) -> Result<(Vec<Part>, Vec<Turn>), E
                 let parts = decode_message_parts(message)?;
                 if !parts.iter().all(|part| matches!(part, Part::Text(_))) {
                     return Err(unsupported("chat system content"));
+                }
+                if !turns.is_empty() {
+                    report.warn(
+                        format!("request.messages[{message_index}].role"),
+                        "late system message promoted to top-level system; position lost",
+                        Severity::Degraded,
+                    );
                 }
                 system.extend(parts);
             }
