@@ -60,8 +60,13 @@ fn live_responses_function_call_id_roundtrip() {
 
     let encoded = Responses.encode_response(&response).unwrap();
     let value: serde_json::Value = serde_json::from_slice(&encoded).unwrap();
-    assert_eq!(value["output"][0]["call_id"], tool_use.id.0.as_ref());
-    assert_eq!(value["output"][0]["arguments"], tool_use.arguments.raw());
+    let output = value["output"].as_array().unwrap();
+    let index = output
+        .iter()
+        .position(|item| item["type"] == "function_call")
+        .expect("encoded output missing function_call");
+    assert_eq!(output[index]["call_id"], tool_use.id.0.as_ref());
+    assert_eq!(output[index]["arguments"], tool_use.arguments.raw());
 }
 
 #[test]
@@ -71,7 +76,9 @@ fn live_responses_stream_terminates_with_completed() {
     let url = required(&env, "LLMWIRE_LIVE_RESPONSES_URL");
     let key = required(&env, "LLMWIRE_LIVE_RESPONSES_API_KEY");
     let model = required(&env, "LLMWIRE_LIVE_RESPONSES_MODEL");
-    let request_body = responses_request_body(&model, smoke_conversation(), true);
+    let mut conversation = smoke_conversation();
+    conversation.sampling.max_output_tokens = Some(1024);
+    let request_body = responses_request_body(&model, conversation, true);
 
     let mut converter = converter(
         ProtocolId::Responses,
@@ -96,8 +103,8 @@ fn live_responses_stream_terminates_with_completed() {
     let mut tail = Vec::new();
     let termination = converter.finish(&mut tail).unwrap();
 
-    assert_eq!(termination, Termination::Explicit);
     let text = String::from_utf8(client_stream).unwrap();
+    assert_eq!(termination, Termination::Explicit, "{text}");
     assert!(text.contains("event: response.completed"));
     assert!(!text.contains("[DONE]"));
 }
@@ -133,9 +140,9 @@ fn tool_conversation() -> Conversation {
             ),
             strict: Some(true),
         }],
-        tool_choice: ToolChoice::Required,
+        tool_choice: ToolChoice::Auto,
         sampling: Sampling {
-            max_output_tokens: Some(64),
+            max_output_tokens: Some(512),
             temperature: Some(0.0),
             ..Sampling::default()
         },

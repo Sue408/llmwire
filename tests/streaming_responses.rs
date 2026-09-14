@@ -465,3 +465,131 @@ fn failure_and_done_marker_are_explicit() {
     let error = Responses.decode_stream_frame(&done, &state).unwrap_err();
     assert!(matches!(error, llmwire::Error::Protocol(_)));
 }
+
+#[test]
+fn reasoning_text_and_encrypted_content_can_coexist() {
+    let mut state = StreamState::new();
+    for decoded in [
+        Responses.decode_stream_frame(
+            &frame(
+                "response.created",
+                json!({"type":"response.created","response":{"id":"resp_1","model":"gpt-test"}}),
+            ),
+            &state,
+        )
+        .unwrap(),
+        Responses.decode_stream_frame(
+            &frame(
+                "response.output_item.added",
+                json!({
+                    "type":"response.output_item.added",
+                    "output_index":0,
+                    "item":{
+                        "type":"reasoning",
+                        "id":"rs_1",
+                        "content":[],
+                        "summary":[],
+                        "encrypted_content":"enc"
+                    }
+                }),
+            ),
+            &state,
+        )
+        .unwrap(),
+        Responses.decode_stream_frame(
+            &frame(
+                "response.content_part.added",
+                json!({
+                    "type":"response.content_part.added",
+                    "output_index":0,
+                    "content_index":0,
+                    "part":{"type":"reasoning_text","text":""}
+                }),
+            ),
+            &state,
+        )
+        .unwrap(),
+        Responses.decode_stream_frame(
+            &frame(
+                "response.reasoning_text.delta",
+                json!({
+                    "type":"response.reasoning_text.delta",
+                    "output_index":0,
+                    "content_index":0,
+                    "delta":"think"
+                }),
+            ),
+            &state,
+        )
+        .unwrap(),
+        Responses.decode_stream_frame(
+            &frame(
+                "response.reasoning_text.done",
+                json!({
+                    "type":"response.reasoning_text.done",
+                    "output_index":0,
+                    "content_index":0,
+                    "text":"think"
+                }),
+            ),
+            &state,
+        )
+        .unwrap(),
+        Responses.decode_stream_frame(
+            &frame(
+                "response.output_item.done",
+                json!({
+                    "type":"response.output_item.done",
+                    "output_index":0,
+                    "item":{
+                        "type":"reasoning",
+                        "id":"rs_1",
+                        "content":[{"type":"reasoning_text","text":"think"}],
+                        "summary":[],
+                        "encrypted_content":"enc"
+                    }
+                }),
+            ),
+            &state,
+        )
+        .unwrap(),
+        Responses.decode_stream_frame(
+            &frame(
+                "response.completed",
+                json!({
+                    "type":"response.completed",
+                    "response":{
+                        "id":"resp_1",
+                        "status":"completed",
+                        "model":"gpt-test",
+                        "output":[{
+                            "type":"reasoning",
+                            "id":"rs_1",
+                            "content":[{"type":"reasoning_text","text":"think"}],
+                            "summary":[],
+                            "encrypted_content":"enc"
+                        }]
+                    }
+                }),
+            ),
+            &state,
+        )
+        .unwrap(),
+    ] {
+        state.apply_all(decoded.events).unwrap();
+    }
+
+    let output = state.assistant_output().unwrap();
+    assert!(output.choices[0]
+        .parts
+        .iter()
+        .any(|part| matches!(part, Part::Thinking(thinking) if thinking.text == "think")));
+    assert!(output.choices[0].parts.iter().any(|part| {
+        matches!(
+            part,
+            Part::Opaque(opaque)
+                if opaque.kind == OpaqueKind::ResponsesEncryptedReasoning
+                    && opaque.bytes.as_ref() == b"enc"
+        )
+    }));
+}
