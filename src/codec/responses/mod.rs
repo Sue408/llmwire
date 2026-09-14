@@ -22,6 +22,7 @@ use wire::*;
 const RESPONSES_ITEM: &str = "responses_item";
 const RESPONSES_CONTENT_PART: &str = "responses_content_part";
 
+/// OpenAI Responses 协议 codec。
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Responses;
 

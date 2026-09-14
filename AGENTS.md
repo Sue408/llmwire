@@ -6,7 +6,7 @@
 
 `llmwire` 是一个**双向、默认无状态、可嵌入任意 host 的 LLM wire protocol 转换核**：host 把原始字节交给一个**请求级 `Converter` 对象**，它负责 SSE 分帧、解析、IR 转换，再序列化回目标协议的字节。
 
-当前阶段：**M0–M4 与 P0–P2 已完成并合并**；M5 图片输入文档已就绪，等待实现。进度见 `docs/PLAN.md`。
+当前阶段：**M0–M5 与 P0–P2 已完成并合并**。公开接入文档见 `README.md`，进度与后续计划见 `docs/PLAN.md`。
 
 ## 状态与约定
 
@@ -21,9 +21,9 @@
 
 ```powershell
 cargo fmt --all -- --check
-cargo clippy --all-targets -- -D warnings
-cargo test -p llmwire
-cargo test -p llmwire --test robustness
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked -p llmwire
+cargo test --locked -p llmwire --test robustness
 pwsh -NoProfile -File scripts/check-core-deps.ps1
 pwsh -NoProfile -File scripts/check-live-gate.ps1
 ```
@@ -32,6 +32,7 @@ pwsh -NoProfile -File scripts/check-live-gate.ps1
 
 | 文件 | 状态 | 什么时候读 |
 |---|---|---|
+| `README.md` | 活跃 | 作为 SDK 使用者接入、运行示例、查看限制 |
 | `docs/README.md` | 活跃 | 想看文档全貌 / 写作规范 / 权威优先级 |
 | `docs/DESIGN.md` | 冻结-稳定 | 定位、架构、模块边界、公开 API、不变量、陷阱 |
 | `docs/spec/IR.md` | 半稳定 | 动 IR 类型、做任意 codec 前**必读** |

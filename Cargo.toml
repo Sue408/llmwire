@@ -2,6 +2,12 @@
 name = "llmwire"
 version = "0.1.0"
 edition = "2021"
+description = "Bidirectional, stateless, transport-neutral LLM wire protocol conversion kernel"
+readme = "README.md"
+license = "MIT"
+documentation = "https://docs.rs/llmwire"
+keywords = ["llm", "openai", "anthropic", "streaming", "sse"]
+categories = ["api-bindings", "encoding"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

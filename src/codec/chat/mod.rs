@@ -15,6 +15,7 @@ use crate::report::{Report, Severity, UnmappedReason};
 use crate::Error;
 use wire::*;
 
+/// OpenAI Chat Completions 协议 codec。
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Chat;
 

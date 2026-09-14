@@ -1,3 +1,4 @@
+//! 请求级转换门面。
 use serde_json::Value;
 use std::collections::BTreeSet;
 
@@ -12,14 +13,44 @@ use crate::ir::{
 use crate::report::{Report, Severity, UnmappedReason};
 use crate::{Error, ProtocolId};
 
+/// 请求级、字节导向的双向协议转换器。
+///
+/// 一个实例只服务一次请求。非流式顺序是 `request`、`response`、`take_report`；
+/// 流式顺序是 `request`、重复 `feed`、`finish`、`take_report`。
 pub trait Converter: Send {
+    /// 将客户端请求转换为后端请求，并记录本次请求的流式模式与上下文。
+    ///
+    /// 输出采用追加语义：SDK 不清空 `out`，调用方复用缓冲区前应自行 `clear()`。
     fn request(&mut self, body: &[u8], out: &mut Vec<u8>) -> Result<(), Error>;
+
+    /// 将完整的后端非流式响应转换为客户端响应。
+    ///
+    /// 对流式请求调用本方法会返回 [`Error::Protocol`]。
     fn response(&mut self, body: &[u8], out: &mut Vec<u8>) -> Result<(), Error>;
+
+    /// 消费一个上游字节片段，并把可输出的流式事件追加到 `out`。
+    ///
+    /// 调用前必须先以 `stream=true` 的请求调用 [`Converter::request`]。
     fn feed(&mut self, chunk: &[u8], out: &mut Vec<u8>) -> Result<(), Error>;
+
+    /// 冲刷分帧尾部和流式状态，并返回终止原因。
+    ///
+    /// 调用前必须已进入流式模式。只有明确终止、完整结束或调用方断连等状态才会返回，
+    /// 无终止符的普通关闭不会被视为 `Explicit`。
     fn finish(&mut self, out: &mut Vec<u8>) -> Result<Termination, Error>;
+
+    /// 取出并清空当前实例累积的质量报告。
     fn take_report(&mut self) -> Report;
 }
 
+/// 构造一个请求级转换器。
+///
+/// `src` 是客户端协议，`dst` 是后端协议。`caps` 决定思考内容、缓存控制与参数支持等策略；
+/// 简单场景可用 [`crate::resolve`] 生成。
+///
+/// # Errors
+///
+/// 当前协议组合无法构造转换器时返回 [`Error::Unsupported`]。
 pub fn converter(
     src: ProtocolId,
     dst: ProtocolId,
