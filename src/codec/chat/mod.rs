@@ -302,10 +302,18 @@ fn decode_content_parts(parts: Vec<ContentPartIn>) -> Result<Vec<Part>, Error> {
         .into_iter()
         .map(|part| match part {
             ContentPartIn::Text { text } => Ok(Part::Text(text)),
-            ContentPartIn::ImageUrl { image_url } => Ok(Part::Image(ImageRef {
-                source: decode_openai_image_url(image_url.url)?,
-                detail: image_url.detail.map(String::into_boxed_str),
-            })),
+            ContentPartIn::ImageUrl { image_url, file_id } => {
+                if file_id.is_some() {
+                    return Err(unsupported("chat image file_id"));
+                }
+                let image_url = image_url.ok_or_else(|| {
+                    Error::InvalidInput("chat image_url part missing image_url".to_owned())
+                })?;
+                Ok(Part::Image(ImageRef {
+                    source: decode_openai_image_url(image_url.url)?,
+                    detail: image_url.detail.map(String::into_boxed_str),
+                }))
+            }
         })
         .collect()
 }

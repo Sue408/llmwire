@@ -42,8 +42,13 @@ pub(crate) enum ContentIn {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub(crate) enum ContentPartIn {
-    Text { text: String },
-    ImageUrl { image_url: ImageUrlIn },
+    Text {
+        text: String,
+    },
+    ImageUrl {
+        image_url: Option<ImageUrlIn>,
+        file_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Deserialize)]

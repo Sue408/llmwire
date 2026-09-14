@@ -4,7 +4,27 @@ use crate::Error;
 pub(crate) fn decode_openai_image_url(url: String) -> Result<ImageSource, Error> {
     match url.strip_prefix("data:") {
         Some(rest) => parse_data_uri(rest),
-        None => Ok(ImageSource::RemoteUrl(url.into_boxed_str())),
+        None => decode_remote_image_url(url),
+    }
+}
+
+pub(crate) fn decode_remote_image_url(url: String) -> Result<ImageSource, Error> {
+    if url.starts_with("http://") || url.starts_with("https://") {
+        Ok(ImageSource::RemoteUrl(url.into_boxed_str()))
+    } else {
+        Err(Error::Unsupported(format!(
+            "unsupported image URL scheme: {url}"
+        )))
+    }
+}
+
+pub(crate) fn validate_base64_payload(data: &str) -> Result<(), Error> {
+    if is_base64(data) {
+        Ok(())
+    } else {
+        Err(Error::InvalidInput(
+            "image base64 payload is invalid".to_owned(),
+        ))
     }
 }
 
@@ -35,11 +55,7 @@ fn parse_data_uri(rest: &str) -> Result<ImageSource, Error> {
             "image data URI must use base64".to_owned(),
         ));
     }
-    if data.is_empty() || !is_base64(data) {
-        return Err(Error::InvalidInput(
-            "image data URI has invalid base64 payload".to_owned(),
-        ));
-    }
+    validate_base64_payload(data)?;
 
     Ok(ImageSource::Base64 {
         media_type: media_type.into(),

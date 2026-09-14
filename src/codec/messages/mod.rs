@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::value::RawValue;
 
+use super::image::{decode_remote_image_url, validate_base64_payload};
 use crate::codec::ProtocolCodec;
 use crate::ids::OpaqueKind;
 use crate::ir::{
@@ -229,18 +230,21 @@ fn decode_block(raw: Box<RawValue>) -> Result<Part, Error> {
             let block: ImageBlockIn = parse_str(raw.get())?;
             match block.source.kind.as_str() {
                 "base64" => match (block.source.media_type, block.source.data) {
-                    (Some(media_type), Some(data)) => Ok(Part::Image(ImageRef {
-                        source: ImageSource::Base64 {
-                            media_type: media_type.into(),
-                            data: data.into(),
-                        },
-                        detail: None,
-                    })),
+                    (Some(media_type), Some(data)) => {
+                        validate_base64_payload(&data)?;
+                        Ok(Part::Image(ImageRef {
+                            source: ImageSource::Base64 {
+                                media_type: media_type.into(),
+                                data: data.into(),
+                            },
+                            detail: None,
+                        }))
+                    }
                     _ => Ok(opaque_block(ANTHROPIC_CONTENT_BLOCK, &raw)),
                 },
                 "url" => match block.source.url {
                     Some(url) => Ok(Part::Image(ImageRef {
-                        source: ImageSource::RemoteUrl(url.into()),
+                        source: decode_remote_image_url(url)?,
                         detail: None,
                     })),
                     None => Ok(opaque_block(ANTHROPIC_CONTENT_BLOCK, &raw)),

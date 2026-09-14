@@ -1,6 +1,6 @@
 use llmwire::codec::{Chat, Messages, ProtocolCodec, Responses};
 use llmwire::ir::{ImageSource, Part};
-use llmwire::{converter, resolve, ProtocolId};
+use llmwire::{converter, resolve, Mode, ProtocolId, Severity, UnmappedReason};
 use serde_json::Value;
 
 #[derive(Clone, Copy, Debug)]
@@ -76,6 +76,118 @@ fn openai_data_uri_and_messages_separate_fields_convert_both_ways() {
         .unwrap();
         assert_wire_image(ProtocolId::Chat, &chat, source, "Messages->Chat", None);
     }
+}
+
+#[test]
+fn image_matrix_covers_all_protocol_directions_and_sources() {
+    for src in [
+        ProtocolId::Chat,
+        ProtocolId::Messages,
+        ProtocolId::Responses,
+    ] {
+        for dst in [
+            ProtocolId::Chat,
+            ProtocolId::Messages,
+            ProtocolId::Responses,
+        ] {
+            for source in [SourceCase::RemoteUrl, SourceCase::Base64] {
+                let case = format!("{src:?}->{dst:?} {source:?}");
+                let mut converter = converter(src, dst, resolve(src, dst, "vision-test")).unwrap();
+                let mut out = Vec::new();
+                converter
+                    .request(&image_request(src, source), &mut out)
+                    .unwrap_or_else(|error| panic!("{case}: {error}"));
+                let target = codec(dst)
+                    .decode_request(&out)
+                    .unwrap_or_else(|error| panic!("{case}: target decode {error}"));
+                assert_image_source(&target, source, &case);
+            }
+        }
+    }
+}
+
+#[test]
+fn unsupported_image_inputs_fail_explicitly() {
+    let chat_ftp = br#"{
+        "messages":[{
+            "role":"user",
+            "content":[{
+                "type":"image_url",
+                "image_url":{"url":"ftp://example.test/image.png"}
+            }]
+        }]
+    }"#;
+    assert!(matches!(
+        Chat.decode_request(chat_ftp),
+        Err(llmwire::Error::Unsupported(_))
+    ));
+
+    let chat_file = br#"{
+        "messages":[{
+            "role":"user",
+            "content":[{"type":"image_url","file_id":"file_1"}]
+        }]
+    }"#;
+    assert!(matches!(
+        Chat.decode_request(chat_file),
+        Err(llmwire::Error::Unsupported(_))
+    ));
+
+    let responses_file = br#"{
+        "input":[{
+            "type":"message",
+            "role":"user",
+            "content":[{"type":"input_image","file_id":"file_1"}]
+        }]
+    }"#;
+    assert!(matches!(
+        Responses.decode_request(responses_file),
+        Err(llmwire::Error::Unsupported(_))
+    ));
+
+    let messages_bad_base64 = br#"{
+        "max_tokens":32,
+        "messages":[{
+            "role":"user",
+            "content":[{
+                "type":"image",
+                "source":{"type":"base64","media_type":"image/png","data":"not-base64"}
+            }]
+        }]
+    }"#;
+    assert!(matches!(
+        Messages.decode_request(messages_bad_base64),
+        Err(llmwire::Error::InvalidInput(_))
+    ));
+}
+
+#[test]
+fn messages_target_reports_image_detail_and_strict_rejects() {
+    let request = image_request(ProtocolId::Chat, SourceCase::RemoteUrl);
+    let mut converted = converter(
+        ProtocolId::Chat,
+        ProtocolId::Messages,
+        resolve(ProtocolId::Chat, ProtocolId::Messages, "claude-test"),
+    )
+    .unwrap();
+    let mut out = Vec::new();
+    converted.request(&request, &mut out).unwrap();
+    let report = converted.take_report();
+    assert!(report.unmapped.iter().any(|entry| {
+        entry.field.as_ref() == "request.messages[0].content[0].detail"
+            && entry.reason == UnmappedReason::NotRepresentable
+            && entry.severity == Severity::Degraded
+    }));
+
+    let mut caps = resolve(ProtocolId::Chat, ProtocolId::Messages, "claude-test");
+    caps.mode = Mode::Strict;
+    let mut strict = converter(ProtocolId::Chat, ProtocolId::Messages, caps).unwrap();
+    let mut out = Vec::new();
+    assert!(matches!(
+        strict.request(&request, &mut out),
+        Err(llmwire::Error::Unsupported(_))
+    ));
+    assert!(strict.take_report().has_fatal());
 }
 
 #[test]
