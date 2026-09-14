@@ -65,6 +65,18 @@ proptest! {
 - 上游流式响应在任意 SSE chunk 切分下，下游输出与终止语义保持一致。
 
 这类测试是常规 fuzz 的快速门禁版本，进入默认 `cargo test`；未来若增加 `cargo-fuzz` target，不得改变核心 crate 的依赖红线。
+### 2.6 图片输入（M5 计划）
+
+M5 只覆盖图片输入的表示转换，不做资源下载/上传。测试必须同时断言 wire 映射和“无传输副作用”：
+
+- `RemoteUrl` 在 Chat / Responses / Messages 中 byte-equal 透传。
+- OpenAI data URI ↔ Anthropic `source.base64` 的 media type / payload 一致。
+- `file_id`、非 http(s) URL、非法 data URI、无法表达的 `detail` 显式失败或上报。
+- 9 个协议方向均覆盖 URL / Base64 图片输入。
+- 测试进程不得因图片转换发起网络请求。
+
+详细规则见 `spec/IMAGE.md`。
+
 ## 3. 目录约定
 
 ```text
@@ -72,6 +84,7 @@ tests/
 ├── boundaries.rs
 ├── robustness.rs
 ├── protocol_matrix.rs
+├── multimodal.rs        # M5 图片输入矩阵
 ├── roundtrip_chat.rs
 ├── roundtrip_messages.rs
 ├── roundtrip_responses.rs
@@ -97,7 +110,7 @@ tests/
 | 基础生成 | 非流式/流式 chat、空/长 system、`max_output_tokens` 截断 |
 | 多轮与上下文 | tool result 回传、`tool_call_id` 保真、迟到 system |
 | 工具调用 | tool call / 并行 call、`arguments` 跨 chunk 拼接、未知函数 |
-| 结构化输出与多模态 | JSON mode、image part（推迟项除外） |
+| 结构化输出与多模态 | JSON mode、M5 图片输入：URL / Base64 / data URI / 降级 |
 | 流式边界与健壮性 | 首/末 chunk、重复 role、注释行、`[DONE]`、`delta:null`、断连 |
 | 错误、限流与计费 | 402/429 区分、缺 usage、`include_usage`、`is_retryable` |
 
@@ -166,7 +179,6 @@ LLMWIRE_LIVE_MESSAGES_MODEL=
 LLMWIRE_LIVE_MESSAGES_VERSION=2023-06-01
 LLMWIRE_LIVE_MESSAGES_BETA=
 
-
 LLMWIRE_LIVE_RESPONSES_URL=https://api.openai.com/v1/responses
 LLMWIRE_LIVE_RESPONSES_API_KEY=
 LLMWIRE_LIVE_RESPONSES_MODEL=
@@ -181,7 +193,7 @@ LLMWIRE_LIVE_ENABLE_THINKING=0
 | 层 | 目标 | 覆盖 |
 |---|---|---|
 | Smoke | 每种协议最小请求可用 | 请求/响应可解码；usage 不伪造；错误清晰 |
-| Compatibility | 真实上游语义兼容 | tool id 字节保真、thinking/signature、`cache_control`、多轮工具、流式终止 |
+| Compatibility | 真实上游语义兼容 | tool id 字节保真、thinking/signature、`cache_control`、多轮工具、流式终止、M5 图片 URL/Base64 |
 | Matrix | 多端点支持度记录 | 官方端点、本地网关、兼容端点的差异与已知限制 |
 
 Live 测试只断言协议契约与不变量，不断言模型输出文本。网络错误、429、超时等属于 host 传输层，不得混入 codec 的正常完成语义。
@@ -200,5 +212,6 @@ Live 测试只断言协议契约与不变量，不断言模型输出文本。网
 | Responses | 流式终止 | 本地网关 | verified | `response.completed` 路径已执行 |
 | 全部协议 | 官方端点 | 官方 API | not-run | 当前矩阵仅覆盖本地网关 |
 | 全部协议 | 跨协议 live | 本地网关 | verified | 6 个有向组合的文本非流式与流式均已执行 |
+| 全部协议 | 图片输入 URL / Base64 | 本地网关 | not-run | M5 尚未实现；需视觉模型，缺能力时 skip 不计为通过 |
 
 Responses 真实验证暴露了 `reasoning_text` 与 `encrypted_content` 共存的事件序列；实现已修正为同一 reasoning item 中分别保留明文 thinking 与加密 opaque。

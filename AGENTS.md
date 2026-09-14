@@ -6,7 +6,7 @@
 
 `llmwire` 是一个**双向、默认无状态、可嵌入任意 host 的 LLM wire protocol 转换核**：host 把原始字节交给一个**请求级 `Converter` 对象**，它负责 SSE 分帧、解析、IR 转换，再序列化回目标协议的字节。
 
-当前阶段：**文档设计阶段**（仓库内暂无 Rust 代码）。正式实现从 M0 开始，见 `docs/PLAN.md`。
+当前阶段：**M0–M4 与 P0–P2 已完成并合并**；M5 图片输入文档已就绪，等待实现。进度见 `docs/PLAN.md`。
 
 ## 状态与约定
 
@@ -17,14 +17,15 @@
   - dev：`proptest`、`insta`。
 - 提交：仅在明确指示时提交。提交信息用 `type: 简述`（如 `docs: …`、`feat(codec): …`）。
 
-## 常用命令（实现开始后生效）
+## 常用命令
 
 ```powershell
-cargo fmt --all
+cargo fmt --all -- --check
 cargo clippy --all-targets -- -D warnings
 cargo test -p llmwire
-cargo test -p llmwire --test roundtrip      # proptest 往返
-cargo insta review                           # 流式事件快照
+cargo test -p llmwire --test robustness
+pwsh -NoProfile -File scripts/check-core-deps.ps1
+pwsh -NoProfile -File scripts/check-live-gate.ps1
 ```
 
 ## 文档地图（按需加载，不要全读）
@@ -34,6 +35,7 @@ cargo insta review                           # 流式事件快照
 | `docs/README.md` | 活跃 | 想看文档全貌 / 写作规范 / 权威优先级 |
 | `docs/DESIGN.md` | 冻结-稳定 | 定位、架构、模块边界、公开 API、不变量、陷阱 |
 | `docs/spec/IR.md` | 半稳定 | 动 IR 类型、做任意 codec 前**必读** |
+| `docs/spec/IMAGE.md` | 半稳定 | 实现/修改 M5 图片输入前**必读** |
 | `docs/spec/STREAMING.md` | 半稳定 | 动流式（`feed`/`finish`/FSM）前**必读** |
 | `docs/spec/chat.md` | 半稳定 | 实现/修改 OpenAI Chat codec |
 | `docs/spec/messages.md` | 半稳定 | 实现/修改 Anthropic Messages codec |
@@ -44,7 +46,7 @@ cargo insta review                           # 流式事件快照
 | `docs/reference/*` | 冻结 | 查协议一手细节的证据（不回改成规范） |
 | `docs/archive/*` | 已废弃 | **仅**用于追溯历史，不权威，不要据此实现 |
 
-**实现任一 codec 的最小阅读集**：`spec/IR.md` + `spec/STREAMING.md` + 对应的 `spec/<protocol>.md`。
+**实现任一 codec 的最小阅读集**：`spec/IR.md` + `spec/STREAMING.md` + 对应的 `spec/<protocol>.md`。实现图片输入时追加 `spec/IMAGE.md`。
 
 ## 权威优先级（冲突时按此裁决）
 
@@ -62,5 +64,5 @@ cargo insta review                           # 流式事件快照
 - **INV-2** 不重算客户端传来的 `cache_control` 断点。
 - **INV-3** 不静默丢弃不支持的字段——显式上报 `Report`。
 - **INV-4** `Opaque`（加密/签名块）不落地明文：日志与 GUI 只记 `kind + len`。
-- **INV-5** 不碰传输层（无 socket / HTTP / async runtime 绑定）。
+- **INV-5** 不碰传输层（无 socket / HTTP / async runtime 绑定；图片 URL 不下载，Base64 不上传）。
 - **INV-6** 无跨请求状态；请求内状态随对象销毁而丢弃。

@@ -15,10 +15,11 @@
 | **M2** | `framing` + 流式 FSM + `Converter` 门面（流式双向） | M2-5 完成 |
 | **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | M3-3 完成 |
 | **M4** | `StaticHost` + `Report` 全链路 + 契约测试 | M4-4 完成 |
+| **M5** | 三协议图片输入：URL / Base64 表示转换 | 文档完成，待实现 |
 
 ## 刻意推迟
 
-Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端内置工具、MCP 拍平、多模态输入输出、请求侧流式、`futures::Stream` adapter。理由见 `DESIGN.md §1`。
+Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端内置工具、MCP 拍平、图片输出、音频/视频/文件管理、URL 下载与 Base64 上传托管、请求侧流式、`futures::Stream` adapter。理由见 `DESIGN.md §1`。
 
 ---
 
@@ -161,10 +162,45 @@ Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端
 
 ### M4-4 Live compatibility matrix
 - 文档锚点: `TESTING.md §7`，`DESIGN.md §10`
-- 要动: `tests/live_*.rs`, `.env.example`, `TESTING.md`
+- 要动: `tests/live_multimodal.rs`, `.env.example`, `TESTING.md`
 - 不变量: INV-3、INV-4、INV-5
 - AC: 默认全 `ignored`；缺配置不访问网络；Chat / Messages / Responses 各有 smoke；覆盖 tool id、thinking、cache_control、usage 与流式终止；核心依赖不新增 HTTP/async runtime
 - 验证: `cargo test -p llmwire --test live_chat -- --ignored --nocapture` 及对应 live tests
+
+---
+
+## M5 — 图片输入（URL / Base64）
+
+> 目标：三协议图片输入的表示转换。核心只处理 `RemoteUrl` 与 `Base64` 的字段/包装差异，不下载、不上传、不托管。
+> 决策：`docs/decisions/0006-image-input-no-transport.md`。
+
+### M5-1 ImageRef 去歧义
+- 文档锚点: `spec/IR.md §3.2`，`spec/IMAGE.md §2–§3`
+- 要动: `src/ir/part.rs`, `src/ir/mod.rs`, `src/codec/*`
+- 不变量: IMG-INV-1、IMG-INV-2、INV-5
+- AC: `Url` 歧义移除；`RemoteUrl` 与 `Base64` 可构造；`data:` URI 不在 `RemoteUrl` 中落地
+- 验证: `cargo test -p llmwire ir_types`
+
+### M5-2 三协议图片输入映射
+- 文档锚点: `spec/IMAGE.md §4–§5`，`spec/chat.md §2`，`spec/messages.md §2`，`spec/responses.md §2`
+- 要动: `src/codec/chat/*`, `src/codec/messages/*`, `src/codec/responses/*`
+- 不变量: IMG-INV-4、IMG-INV-5、INV-3
+- AC: 远程 URL 与 Base64 三家双向往返；OpenAI data URI 与 Anthropic 分离字段互转；无网络调用
+- 验证: `cargo test -p llmwire --test multimodal`
+
+### M5-3 跨协议图片矩阵与降级
+- 文档锚点: `spec/IMAGE.md §5–§7`
+- 要动: `tests/protocol_matrix.rs`, `tests/multimodal.rs`
+- 不变量: INV-3、INV-5、IMG-INV-3、IMG-INV-4
+- AC: 9 个协议方向的 URL / Base64 矩阵通过；非法 data URI、`file_id`、非 http(s) URL、无法表达的 `detail` 显式上报/失败
+- 验证: `cargo test -p llmwire --test multimodal`、`cargo test -p llmwire --test protocol_matrix`
+
+### M5-4 Vision live 兼容矩阵
+- 文档锚点: `TESTING.md §7`
+- 要动: `tests/live_multimodal.rs`, `.env.example`, `TESTING.md`
+- 不变量: INV-5
+- AC: 支持视觉的模型分别验证 URL 与 Base64；默认 ignored；缺模型/能力时明确 skip，不计为通过
+- 验证: `cargo test -p llmwire --test live_multimodal -- --ignored --nocapture`
 
 ---
 

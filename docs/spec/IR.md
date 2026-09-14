@@ -64,10 +64,19 @@ pub enum Part {
 }
 
 #[derive(Debug, Clone)]
+pub struct ImageRef {
+    pub source: ImageSource,
+    pub detail: Option<Box<str>>,
+}
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum ImageRef {
-    Url(Box<str>),
-    Base64 { media_type: Box<str>, data: Box<str> },
+pub enum ImageSource {
+    RemoteUrl(Box<str>),
+    Base64 {
+        media_type: Box<str>,
+        data: Box<str>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +120,21 @@ pub enum OpaqueKind {
 **IR-INV-OPAQUE-1**：`Opaque` **不实现 `Display`、不提供 `as_str()`**。用类型系统阻止误用。
 **IR-INV-OPAQUE-2**：`Opaque` 的 `Debug`、日志与 GUI 只以 `kind + len` 呈现，不得输出 `bytes`（对应 `DESIGN.md` INV-4）。
 **IR-INV-OPAQUE-3**：round-trip 后 `bytes` 必须 byte-equal。
+
+### 3.2 ImageRef
+
+`ImageRef` 用于图片输入，类型定义见 §3；它必须区分**远程资源**和**内联字节**：
+
+- `RemoteUrl` 只表示目标服务端需要自行获取的 `http://` / `https://` URL，字符串 byte-equal。
+- `Base64.data` 只保存纯 payload，不含 `data:<media_type>;base64,` 前缀。
+- `detail` 保留 OpenAI 图片提示原始值；目标协议无法表达时记 `Report`。
+- `data:` URI 在 codec 边界解析为 `Base64`，反向编码时再合成。
+- 核心不下载 URL、不上传 Base64、不生成托管 URL；详细规则见 `IMAGE.md`。
+
+**IR-INV-IMG-1**：`RemoteUrl` 不解析、不改写、不重排 URL 字符串。
+**IR-INV-IMG-2**：`Base64.data` 不包含 data URI 前缀，`media_type` 独立保存。
+**IR-INV-IMG-3**：图片转换核心不碰传输层，不主动获取或托管资源。
+**IR-INV-IMG-4**：无法表达的图片字段/表示必须进 `Report`。
 
 ## 4. Canonical form（合并规则）
 
@@ -314,10 +338,15 @@ Anthropic → IR:  input = input_anthropic + cache_read + cache_creation
 | IR-INV-TOOL-2 | `tool_result.tool_use_id == tool_use.id` |
 | IR-INV-USAGE-1 | `None ≠ 0` |
 | IR-INV-USAGE-2 | usage 包含关系固定 |
+| IR-INV-IMG-1 | RemoteUrl 字节保真 |
+| IR-INV-IMG-2 | Base64 payload 与 media type 分离 |
+| IR-INV-IMG-3 | 图片 core 不碰传输 |
+| IR-INV-IMG-4 | 图片降级必须 Report |
 | IR-INV-N-1 | 多候选不得静默退化 |
 
 ## 10. 相关文档
 
 - 流式事件与 FSM：`STREAMING.md`
 - 各协议映射：`chat.md` / `messages.md` / `responses.md`
+- 图片输入规范：`IMAGE.md`
 - API 与错误信道：`../DESIGN.md §4、§6`
