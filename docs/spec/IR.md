@@ -294,7 +294,7 @@ pub struct Usage {
 **IR-INV-USAGE-2**：包含关系在 IR 规约写死，codec 不得自由发挥：
 
 ```text
-IR → Anthropic:  input_anthropic = input - cached
+IR → Anthropic:  input_anthropic = input - cached - cache_creation
                  cache_read       = cached
                  cache_creation   = cache_creation
 Anthropic → IR:  input = input_anthropic + cache_read + cache_creation

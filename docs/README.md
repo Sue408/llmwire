@@ -99,3 +99,4 @@ llmwire/
 | 2026-09-14 | Chat 空 `delta.content` 与“首个非空”冲突 | `spec/chat.md CHAT-TRAP-5` | 明确空字符串也算 `delta.content` 首次出现；已处理 |
 | 2026-09-14 | `ImageRef` 被引用但未定义 | `spec/IR.md §3` 核心类型完整性 | 补充 `Url` / `Base64` 两态；已处理 |
 | 2026-09-14 | `Opaque` 派生 `Debug` 会暴露 bytes，违背 INV-4 | `DESIGN.md` INV-4 优先 | 改为手写 `Debug`，仅输出 `kind + len`；已处理 |
+| 2026-09-14 | IR-INV-USAGE-2 正向公式漏减 cache_creation，与反向公式和包含关系注释冲突 | IR.md §8 的可逆 round-trip 要求 | 正向改为同时减去 cached / cache_creation；已处理 |
