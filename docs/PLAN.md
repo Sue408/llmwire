@@ -10,7 +10,7 @@
 
 | 里程碑 | 目标 | 状态 |
 |---|---|---|
-| **M0** | crate 骨架 + `ir` + `chat` codec（非流式双向） | 进行中（M0-1 完成） |
+| **M0** | crate 骨架 + `ir` + `chat` codec（非流式双向） | 进行中（M0-2 完成） |
 | **M1** | `messages` codec + `caps`/`resolve`（非流式双向） | 未开始 |
 | **M2** | `framing` + 流式 FSM + `Converter` 门面（流式双向） | 未开始 |
 | **M3** | `responses` codec（仅无状态）+ 流内 error 事件 | 未开始 |
@@ -34,7 +34,7 @@ Gemini codec、`ResponseStore`（`store` / `previous_response_id`）、服务端
 ### M0-2 IR 核心类型
 - 文档锚点: `spec/IR.md §2–§8`
 - 要动: `src/ir/{mod,part,tool,sampling,output,usage}.rs`
-- 不变量: IR-INV-OPAQUE-1、IR-INV-RAW-1、IR-INV-TOOL-1、IR-INV-USAGE-1
+- 不变量: IR-INV-OPAQUE-1、IR-INV-OPAQUE-2、IR-INV-RAW-1、IR-INV-TOOL-1、IR-INV-USAGE-1
 - AC: 类型可构造；`Opaque` 无 `Display`/`as_str()`（编译期断言）
 - 验证: `cargo test -p llmwire`
 

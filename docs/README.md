@@ -97,3 +97,5 @@ llmwire/
 | 2026-09-14 | 流式 `Opaque` / `signature_delta` 缺少内部事件表达，`responses` 引用不存在的 `Event::Opaque` | `spec/STREAMING.md` 事件集为准 | 增加 `PartKind::Opaque(OpaqueKind)` 与 `Delta::Opaque`；协议映射改用 `PartDelta`；已处理 |
 | 2026-09-14 | `response.incomplete` 引用不存在的 `StopReason::MultipleCandidates` | `spec/IR.md §7`、`spec/responses.md §5` | 按 `incomplete_details.reason` 映射 `MaxTokens` / `ContentFilter` / `Other` 并上报；已处理 |
 | 2026-09-14 | Chat 空 `delta.content` 与“首个非空”冲突 | `spec/chat.md CHAT-TRAP-5` | 明确空字符串也算 `delta.content` 首次出现；已处理 |
+| 2026-09-14 | `ImageRef` 被引用但未定义 | `spec/IR.md §3` 核心类型完整性 | 补充 `Url` / `Base64` 两态；已处理 |
+| 2026-09-14 | `Opaque` 派生 `Debug` 会暴露 bytes，违背 INV-4 | `DESIGN.md` INV-4 优先 | 改为手写 `Debug`，仅输出 `kind + len`；已处理 |

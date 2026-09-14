@@ -62,6 +62,19 @@ pub enum Part {
     /// 语义：不得解读、不得改写、不得摘要，必须字节级回传。
     Opaque(Opaque),
 }
+
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum ImageRef {
+    Url(Box<str>),
+    Base64 { media_type: Box<str>, data: Box<str> },
+}
+
+#[derive(Debug, Clone)]
+pub struct Thinking {
+    pub text: String,
+    pub signature: Option<Opaque>,
+}
 ```
 
 `Thinking` 用于 Anthropic 明文 thinking（`{ text, signature: Option<Opaque> }`）；`redacted_thinking`、Responses `encrypted_content`、Gemini `thoughtSignature` 全部走 `Opaque`。
@@ -69,10 +82,19 @@ pub enum Part {
 ### 3.1 Opaque
 
 ```rust
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Opaque {
     pub kind: OpaqueKind,      // 来源协议标记，反向时路由回正确的 wire 类型
     pub bytes: Box<[u8]>,      // 原始字节
+}
+
+impl std::fmt::Debug for Opaque {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Opaque")
+            .field("kind", &self.kind)
+            .field("len", &self.bytes.len())
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,7 +109,7 @@ pub enum OpaqueKind {
 ```
 
 **IR-INV-OPAQUE-1**：`Opaque` **不实现 `Display`、不提供 `as_str()`**。用类型系统阻止误用。
-**IR-INV-OPAQUE-2**：`Opaque` 在日志/GUI 中只以 `kind + len` 呈现（对应 `DESIGN.md` INV-4）。
+**IR-INV-OPAQUE-2**：`Opaque` 的 `Debug`、日志与 GUI 只以 `kind + len` 呈现，不得输出 `bytes`（对应 `DESIGN.md` INV-4）。
 **IR-INV-OPAQUE-3**：round-trip 后 `bytes` 必须 byte-equal。
 
 ## 4. Canonical form（合并规则）
@@ -149,9 +171,10 @@ pub enum ToolUseKind {
     Remote { server: Option<Box<str>> }, // MCP 远程（mcp__server__tool）
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[non_exhaustive]
 pub enum ToolChoice {
+    #[default]
     Auto, Required, None,
     Named(Box<str>),
     /// 无法归类：保留原值，绝不静默降级
@@ -169,6 +192,10 @@ pub struct RawJson {
 }
 
 impl RawJson {
+    pub fn from_raw(raw: impl Into<Box<str>>) -> Self {
+        Self { raw: raw.into(), parsed: std::sync::OnceLock::new() }
+    }
+
     pub fn raw(&self) -> &str { &self.raw }              // 字节级权威
     pub fn parsed(&self) -> Option<&serde_json::Value> { // 惰性派生
         self.parsed.get_or_init(|| serde_json::from_str(&self.raw).ok()).as_ref()
@@ -202,6 +229,10 @@ pub struct Sampling {
     pub frequency_penalty: Option<f32>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ReasoningEffort { Minimal, Low, Medium, High, None }
+
 #[derive(Debug, Clone, Default)]
 pub struct Reasoning {
     pub enabled: bool,
@@ -228,14 +259,16 @@ pub struct Choice {
     pub finish: Finish,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StopReason {
+    #[default]
     EndTurn, MaxTokens, StopSequence, ToolUse,
     ContentFilter, Pause, Cancelled,
     Other(Box<str>),                 // 无法归类保留原值，绝不降级成 EndTurn
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct Finish {
     pub canonical: StopReason,
     pub provider_raw: Box<str>,      // 双向可追溯
