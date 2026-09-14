@@ -62,14 +62,15 @@ fn messages_usage_cache_fields_are_preserved() {
 #[test]
 fn messages_estimated_input_usage_is_reported() {
     let mut converter = converter(
-        ProtocolId::Chat,
         ProtocolId::Messages,
-        resolve(ProtocolId::Chat, ProtocolId::Messages, "claude-test"),
+        ProtocolId::Chat,
+        resolve(ProtocolId::Messages, ProtocolId::Chat, "gpt-test"),
     )
     .unwrap();
     let request = br#"{
-        "model":"model-a",
+        "model":"gpt-test",
         "stream":true,
+        "max_tokens":32,
         "messages":[{"role":"user","content":"hello"}]
     }"#;
     let mut request_out = Vec::new();

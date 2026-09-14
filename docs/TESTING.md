@@ -60,6 +60,7 @@ proptest! {
 ```text
 tests/
 ├── boundaries.rs
+├── protocol_matrix.rs
 ├── roundtrip_chat.rs
 ├── roundtrip_messages.rs
 ├── roundtrip_responses.rs
@@ -96,6 +97,7 @@ tests/
 cargo test -p llmwire                          # 全部
 cargo test -p llmwire --test roundtrip_chat    # 单个往返
 cargo test -p llmwire --test boundaries      # P0 边界
+cargo test -p llmwire --test protocol_matrix  # 3x3 矩阵
 cargo test -p llmwire --test golden_tool_id
 ```
 
