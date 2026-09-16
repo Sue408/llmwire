@@ -1,5 +1,7 @@
 # llmwire
 
+[English](README.en.md) | 简体中文
+
 `llmwire` 是一个**双向、默认无状态、可嵌入任意 host 的 LLM wire protocol 转换核**。
 
 Host 把原始请求或响应字节交给请求级 `Converter`，它负责：
