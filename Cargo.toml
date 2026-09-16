@@ -6,8 +6,10 @@ description = "Bidirectional, stateless, transport-neutral LLM wire protocol con
 readme = "README.md"
 license = "MIT"
 documentation = "https://docs.rs/llmwire"
+repository = "https://github.com/Sue408/llmwire"
 keywords = ["llm", "openai", "anthropic", "streaming", "sse"]
 categories = ["api-bindings", "encoding"]
+exclude = [".github/", "AGENTS.md"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

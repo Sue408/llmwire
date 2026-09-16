@@ -35,7 +35,20 @@ Host 把原始请求或响应字节交给请求级 `Converter`，它负责：
 
 ## 安装
 
-发布前使用本地路径或 Git 引用：
+从 crates.io 安装：
+
+```bash
+cargo add llmwire
+```
+
+也可以直接写入 `Cargo.toml`：
+
+```toml
+[dependencies]
+llmwire = "0.1"
+```
+
+本地开发时可以使用仓库路径：
 
 ```toml
 [dependencies]
